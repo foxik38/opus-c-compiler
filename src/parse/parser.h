@@ -172,7 +172,6 @@ Node *compound_stmt(Token **rest, Token *tok);
 
 // Evaluates a constant that may be an address: result = &label + value.
 int64_t eval_reloc(Node *node, char **label);
-bool is_const_int_expr(Node *node);
 
 // ---------------------------------------------------------------------------
 // Checks (check.c)

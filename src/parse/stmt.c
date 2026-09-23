@@ -438,8 +438,9 @@ Node *compound_stmt(Token **rest, Token *tok) {
 
 static void finish_translation_unit(Program *prog) {
   for (Obj *var = P.globals; var; var = var->next) {
+    bool from_user = var->tok && var->tok->file && !var->tok->file->is_system;
     if (var->is_function) {
-      prog->functions += var->is_definition;
+      prog->functions += var->is_definition && from_user;
       if (var->is_static && var->is_definition && !var->is_referenced && !var->is_inline)
         warn_tok(W_UNUSED_FUNCTION, var->tok, "unused function '%s'", var->name);
       if (var->is_static && !var->is_definition && var->is_referenced)
@@ -449,7 +450,7 @@ static void finish_translation_unit(Program *prog) {
     }
     if (!var->is_definition)
       continue;
-    prog->variables++;
+    prog->variables += from_user && var->name[0] != '.';
     // A tentative array of unknown size becomes a one-element array (C23 6.9.2).
     if (var->ty->kind == TY_ARRAY && var->ty->array_len < 0) {
       var->ty = array_of(var->ty->base, 1);

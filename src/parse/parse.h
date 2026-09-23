@@ -10,6 +10,7 @@ Program *parse(Token *tok);
 bool has_side_effects(Node *node);
 
 // Constant evaluation, also used by the optimizer.
-bool is_const_expr(Node *node);
+bool is_const_expr(Node *node);     // integer, floating or address constant
+bool is_const_int_expr(Node *node); // integer constant (no address)
 int64_t eval_int(Node *node);
 double eval_double(Node *node);

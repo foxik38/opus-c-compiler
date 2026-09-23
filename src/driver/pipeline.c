@@ -156,8 +156,9 @@ static char *output_name(Build *b, const char *input, const char *ext, int index
   return format("%s/%d-%s%s", b->tmpdir, index, strip_extension(input), ext);
 }
 
-static bool assemble(Build *b, const char *src, int index) {
-  char *obj = output_name(b, src, ".o", index);
+// Assembles `src`; the object is named after the original input file.
+static bool assemble(Build *b, const char *src, const char *input, int index) {
+  char *obj = output_name(b, input, ".o", index);
   StrVec cmd = assemble_command(src, obj);
   if (b->opts->verbose)
     report_command(join_argv(cmd.data));
@@ -258,7 +259,7 @@ static bool compile_c_file(Build *b, const char *path, int index) {
     return ok;
 
   // 3. Assemble.
-  return assemble(b, asm_path, index);
+  return assemble(b, asm_path, path, index);
 }
 
 static bool link_executable(Build *b, const char *output) {
@@ -362,7 +363,7 @@ int run_pipeline(Options *opts) {
     } else if (ends_with(in, ".s") || ends_with(in, ".S")) {
       if (opts->stop == STOP_EXECUTABLE || opts->stop == STOP_OBJECT) {
         report_file(in);
-        ok &= assemble(&b, in, (int)i);
+        ok &= assemble(&b, in, in, (int)i);
       }
     } else {
       vec_push(&b.objects, in); // object files and archives go to the linker

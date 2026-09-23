@@ -35,14 +35,25 @@ test: occ
 	@./tests/run.sh ./occ
 
 # Stage 2: occ compiled by occ (with optimizations enabled).
+OCC_FLAGS := -Isrc -D_DEFAULT_SOURCE -DOCC_INSTALL_INCLUDE_DIR='"$(PREFIX)/lib/occ/include"'
+
 build/stage2/occ: occ $(SRCS)
 	@mkdir -p build/stage2
-	./occ -q -o prod -n $@ -Isrc -D_DEFAULT_SOURCE \
-	  -DOCC_INSTALL_INCLUDE_DIR='"$(PREFIX)/lib/occ/include"' $(SRCS)
+	./occ -q -o prod -n $@ $(OCC_FLAGS) $(SRCS)
 
+# Self-hosting check: the stage-2 compiler must pass the test suite and emit
+# exactly the same assembly as the stage-1 compiler (a bootstrap fixpoint).
 selfhost: build/stage2/occ
 	@cp build/stage2/occ ./occ-stage2
 	@./tests/run.sh ./occ-stage2
+	@rm -rf build/fixpoint && mkdir -p build/fixpoint/stage1 build/fixpoint/stage2
+	@for f in $(SRCS); do \
+	  n=$$(echo $$f | tr / _); \
+	  ./occ -q -o prod -S $(OCC_FLAGS) -n build/fixpoint/stage1/$$n.s $$f || exit 1; \
+	  ./occ-stage2 -q -o prod -S $(OCC_FLAGS) -n build/fixpoint/stage2/$$n.s $$f || exit 1; \
+	done
+	@diff -r build/fixpoint/stage1 build/fixpoint/stage2 >/dev/null && \
+	  echo "selfhost: stage 1 and stage 2 generate identical assembly (fixpoint reached)"
 
 bench: occ
 	@./tests/bench/run.sh ./occ

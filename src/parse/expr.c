@@ -280,7 +280,7 @@ Node *convert_for_assign(Node *expr, Type *ty, Token *tok, const char *ctx) {
 
 // Condition of if/while/for/?:/&&/||/!.
 Node *to_condition(Node *node, Token *tok) {
-  if (node->kind == ND_ASSIGN && !node->in_parens)
+  if (node->kind == ND_ASSIGN && !node->in_parens && tok_equal(node->tok, "="))
     warn_tok(W_PARENTHESES, node->tok, "using the result of an assignment as a condition without parentheses");
   node = rvalue(node);
   if (!is_scalar(node->ty))
