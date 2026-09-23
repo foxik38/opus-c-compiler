@@ -187,7 +187,7 @@ static Member *struct_designator(Token **rest, Token *tok, Type *ty) {
 }
 
 static void array_initializer2(Token **rest, Token *tok, Initializer *init, int i);
-static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Member *mem);
+static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Member *mem, bool after_element);
 
 static void designation(Token **rest, Token *tok, Initializer *init) {
   if (tok_equal(tok, "[")) {
@@ -206,7 +206,7 @@ static void designation(Token **rest, Token *tok, Initializer *init) {
     Member *mem = struct_designator(&tok, tok, init->ty);
     designation(&tok, tok, init->children[mem->idx]);
     init->expr = nullptr;
-    struct_initializer2(rest, tok, init, next_initializable(mem->next));
+    struct_initializer2(rest, tok, init, next_initializable(mem->next), true);
     return;
   }
 
@@ -336,8 +336,10 @@ static void struct_initializer1(Token **rest, Token *tok, Initializer *init) {
   }
 }
 
-static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Member *mem) {
-  bool first = true;
+// Brace-elided struct. `after_element` is set when continuing after a
+// designated element, so the next element is preceded by a comma.
+static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Member *mem, bool after_element) {
+  bool first = !after_element;
   for (; mem && !is_end(tok); mem = next_initializable(mem->next)) {
     Token *start = tok;
     if (!first)
@@ -429,7 +431,7 @@ static void initializer2(Token **rest, Token *tok, Initializer *init) {
     else if (tok_equal(tok, "{"))
       struct_initializer1(rest, tok, init);
     else
-      struct_initializer2(rest, tok, init, next_initializable(init->ty->members));
+      struct_initializer2(rest, tok, init, next_initializable(init->ty->members), false);
     return;
   }
 

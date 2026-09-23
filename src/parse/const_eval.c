@@ -68,9 +68,16 @@ static int64_t eval_rec(Node *node, char **label, bool *ok) {
     return wrap((int64_t)((uint64_t)l + (uint64_t)eval_rec(node->rhs, nullptr, ok)), ty);
   }
   case ND_SUB: {
+    if (node->lhs->ty->kind == TY_PTR && node->rhs->ty->kind == TY_PTR) {
+      // The distance between two addresses in the same object is constant.
+      char *l1 = nullptr, *l2 = nullptr;
+      int64_t a = eval_rec(node->lhs, &l1, ok);
+      int64_t b = eval_rec(node->rhs, &l2, ok);
+      if ((l1 || l2) && (!l1 || !l2 || strcmp(l1, l2) != 0))
+        return fail(ok);
+      return a - b;
+    }
     int64_t l = eval_rec(node->lhs, label, ok);
-    if (node->lhs->ty->kind == TY_PTR && node->rhs->ty->kind == TY_PTR && label && *label)
-      return fail(ok); // difference of two addresses
     return wrap((int64_t)((uint64_t)l - (uint64_t)eval_rec(node->rhs, nullptr, ok)), ty);
   }
   case ND_MUL:
