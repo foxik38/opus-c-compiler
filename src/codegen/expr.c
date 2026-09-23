@@ -339,8 +339,11 @@ void cast(Type *from, Type *to) {
 
 // Returns an operand that can be the source of an integer instruction of
 // the given size without evaluating any code, or nullptr.
+//
+// Constants are used directly even at -o none: nothing may be pushed across
+// a call that can return twice (setjmp(env) == 0).
 static char *simple_operand(Node *n, int size) {
-  if (!cg.optimize)
+  if (!cg.optimize && n->kind != ND_NUM)
     return nullptr;
   if (n->kind == ND_NUM && is_int_or_ptr(n->ty)) {
     if (size == 4 && n->val >= INT32_MIN && n->val <= UINT32_MAX)
@@ -454,7 +457,9 @@ static void gen_assign(Node *node) {
     gen_bitfield_store(node);
     return;
   }
-  if (cg.optimize && lhs->kind == ND_VAR && is_scalar(lhs->ty)) {
+  // Stores to plain variables evaluate the value first and need no pushed
+  // address. Besides being shorter, this keeps "x = setjmp(env)" working.
+  if (lhs->kind == ND_VAR && is_scalar(lhs->ty)) {
     char *dst = var_operand(lhs->var);
     if (dst) {
       gen_expr(node->rhs);

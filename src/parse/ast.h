@@ -45,6 +45,7 @@ struct Type {
   bool is_volatile;
   bool is_restrict;
   bool is_atomic;
+  bool is_signed_char; // "signed char", a type distinct from plain "char"
   int size;  // sizeof; negative while incomplete
   int align; // alignof
 
@@ -93,7 +94,7 @@ struct Member {
 };
 
 extern Type *ty_void, *ty_bool, *ty_nullptr;
-extern Type *ty_char, *ty_short, *ty_int, *ty_long, *ty_llong;
+extern Type *ty_char, *ty_schar, *ty_short, *ty_int, *ty_long, *ty_llong;
 extern Type *ty_uchar, *ty_ushort, *ty_uint, *ty_ulong, *ty_ullong;
 extern Type *ty_float, *ty_double, *ty_ldouble;
 

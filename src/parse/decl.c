@@ -348,7 +348,8 @@ Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
     switch (counter) {
     case VOID: ty = ty_void; break;
     case BOOL: ty = ty_bool; break;
-    case CHAR: case SIGNED + CHAR: ty = ty_char; break;
+    case CHAR: ty = ty_char; break;
+    case SIGNED + CHAR: ty = ty_schar; break;
     case UNSIGNED + CHAR: ty = ty_uchar; break;
     case SHORT: case SHORT + INT: case SIGNED + SHORT: case SIGNED + SHORT + INT:
       ty = ty_short;

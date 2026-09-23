@@ -8,7 +8,8 @@ Type *ty_void = BASIC(TY_VOID, 1, false);
 Type *ty_bool = BASIC(TY_BOOL, 1, true);
 Type *ty_nullptr = BASIC(TY_NULLPTR, 8, false);
 
-Type *ty_char = BASIC(TY_CHAR, 1, false);
+Type *ty_char = BASIC(TY_CHAR, 1, false); // plain char is signed on x86-64
+Type *ty_schar = &(Type){.kind = TY_CHAR, .is_signed_char = true, .size = 1, .align = 1};
 Type *ty_short = BASIC(TY_SHORT, 2, false);
 Type *ty_int = BASIC(TY_INT, 4, false);
 Type *ty_long = BASIC(TY_LONG, 8, false);
@@ -185,7 +186,7 @@ int integer_rank(const Type *ty) {
 static Type *unqualified_basic(Type *ty) {
   switch (ty->kind) {
   case TY_BOOL: return ty_bool;
-  case TY_CHAR: return ty->is_unsigned ? ty_uchar : ty_char;
+  case TY_CHAR: return ty->is_unsigned ? ty_uchar : ty->is_signed_char ? ty_schar : ty_char;
   case TY_SHORT: return ty->is_unsigned ? ty_ushort : ty_short;
   case TY_INT: return ty->is_unsigned ? ty_uint : ty_int;
   case TY_LONG: return ty->is_unsigned ? ty_ulong : ty_long;
@@ -245,7 +246,9 @@ bool types_compatible(Type *a, Type *b) {
     return false;
 
   switch (a->kind) {
-  case TY_CHAR: case TY_SHORT: case TY_INT: case TY_LONG: case TY_LLONG:
+  case TY_CHAR:
+    return a->is_unsigned == b->is_unsigned && a->is_signed_char == b->is_signed_char;
+  case TY_SHORT: case TY_INT: case TY_LONG: case TY_LLONG:
     return a->is_unsigned == b->is_unsigned;
   case TY_BOOL: case TY_FLOAT: case TY_DOUBLE: case TY_LDOUBLE: case TY_VOID: case TY_NULLPTR:
     return true;
@@ -295,6 +298,8 @@ static const char *basic_name(const Type *ty) {
       [TY_LDOUBLE] = {"long double", "long double"},
       [TY_NULLPTR] = {"nullptr_t", "nullptr_t"},
   };
+  if (ty->is_signed_char)
+    return "signed char";
   return names[ty->kind][ty->kind == TY_BOOL ? 0 : ty->is_unsigned];
 }
 
