@@ -4,6 +4,7 @@
 #   make test       run the test suite (every test at -o none and -o prod)
 #   make selfhost   compile occ with itself (stage 2) and run the tests with it
 #   make bench      compare generated code speed
+#   make fuzz       differential fuzzing against GCC (FUZZ_COUNT=200)
 #   make install    install to $(PREFIX) (default /usr/local)
 
 CC      ?= cc
@@ -20,7 +21,7 @@ SRCS    := $(sort $(shell find src -name '*.c'))
 OBJS    := $(SRCS:src/%.c=build/%.o)
 DEPS    := $(OBJS:.o=.d)
 
-.PHONY: all test test-stage2 selfhost bench install uninstall clean format
+.PHONY: all test selfhost bench fuzz install uninstall clean
 
 all: occ
 
@@ -58,6 +59,11 @@ selfhost: build/stage2/occ
 bench: occ
 	@./tests/bench/run.sh ./occ
 
+# Differential fuzzing against GCC (FUZZ_COUNT programs, random seed).
+FUZZ_COUNT ?= 200
+fuzz: occ
+	@python3 tests/fuzz/fuzz.py --count $(FUZZ_COUNT)
+
 install: occ
 	install -d $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/lib/occ/include
 	install -m 755 occ $(DESTDIR)$(PREFIX)/bin/occ
@@ -69,8 +75,5 @@ uninstall:
 
 clean:
 	rm -rf build occ occ-stage2 tests/out
-
-format:
-	clang-format -i $(SRCS) $(shell find src -name '*.h')
 
 -include $(DEPS)
