@@ -84,6 +84,15 @@ again:
   return i;
 }
 
+// A loop whose invariant address computation is hoisted (-o prod): the
+// statement after it must still run exactly once (found by tests/fuzz).
+// No return follows, so a duplicated statement would not be dead code.
+static void after_hoisted_loop(long *a, long k, int *after) {
+  for (int i = 0; i < 3; i++)
+    a[k + 1] += i;
+  ++*after;
+}
+
 int main(void) {
   // if / else chains.
   int x = 5, r;
@@ -229,6 +238,12 @@ done:
   ASSERT(1, lz ? 1 : 0); // must test all 64 bits
   if (lz) r = 5; else r = 6;
   ASSERT(5, r);
+
+  long hv[4] = {};
+  int after = 0;
+  after_hoisted_loop(hv, 1, &after);
+  ASSERT(1, after);
+  ASSERT(3, hv[2]);
 
   return test_done();
 }

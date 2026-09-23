@@ -273,6 +273,7 @@ static Node *process_stmt(Licm *lx, Node *n, int depth) {
     first = init;
   }
   h.tail->next = n;
+  n->next = nullptr; // the caller relinks the block into the statement list
   block->body = first;
   return block;
 }
