@@ -178,7 +178,8 @@ int64_t eval_reloc(Node *node, char **label);
 // Checks (check.c)
 // ---------------------------------------------------------------------------
 
-void check_format_call(Node *call, const char *name);
+// arg_toks[i]: first token of argument i, where format warnings point.
+void check_format_call(Node *call, const char *name, Token **arg_toks);
 bool stmt_falls_through(Node *node);
 bool is_noreturn_call(Node *node);
 void check_unused_locals(Scope *scope);

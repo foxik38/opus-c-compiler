@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="210" viewBox="0 0 960 210">
+  <style>
+    .box { rx: 12; }
+    .title { font-family: 'Inter','Segoe UI','Helvetica Neue',Arial,sans-serif; font-size: 16px; font-weight: 700; fill: #1e1e2e; }
+    .sub { font-family: 'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace; font-size: 11.5px; fill: #1e1e2e; opacity: .78; }
+    .io { font-family: 'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace; font-size: 12px; fill: #9399b2; }
+    .arrow { stroke: #9399b2; stroke-width: 2; fill: none; marker-end: url(#head); }
+  </style>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9399b2"/>
+    </marker>
+  </defs>
+  <rect width="960" height="210" rx="14" fill="#1e1e2e"/>
+
+  <text x="24" y="109" class="io">file.c</text>
+  <path d="M72 104 H98" class="arrow"/>
+
+  <!-- preprocess -->
+  <rect x="102" y="52" width="150" height="104" rx="12" fill="#d787ff"/>
+  <text x="177" y="86" text-anchor="middle" class="title">preprocess</text>
+  <text x="177" y="108" text-anchor="middle" class="sub">macros, #include</text>
+  <text x="177" y="124" text-anchor="middle" class="sub">#embed, #if</text>
+  <text x="177" y="140" text-anchor="middle" class="sub">src/preproc</text>
+  <path d="M252 104 H302" class="arrow"/>
+  <text x="277" y="94" text-anchor="middle" class="io">tokens</text>
+
+  <!-- compile -->
+  <rect x="306" y="30" width="300" height="148" rx="12" fill="#5fafff"/>
+  <text x="456" y="56" text-anchor="middle" class="title">compile</text>
+  <rect x="320" y="70" width="84" height="94" rx="9" fill="#ffffff" opacity=".35"/>
+  <text x="362" y="96" text-anchor="middle" class="title" style="font-size:13px">parse</text>
+  <text x="362" y="114" text-anchor="middle" class="sub">typed AST</text>
+  <text x="362" y="130" text-anchor="middle" class="sub">+ checks</text>
+  <text x="362" y="150" text-anchor="middle" class="sub">src/parse</text>
+  <rect x="414" y="70" width="84" height="94" rx="9" fill="#ffffff" opacity=".35"/>
+  <text x="456" y="96" text-anchor="middle" class="title" style="font-size:13px">optimize</text>
+  <text x="456" y="114" text-anchor="middle" class="sub">fold, LICM</text>
+  <text x="456" y="130" text-anchor="middle" class="sub">-o prod</text>
+  <text x="456" y="150" text-anchor="middle" class="sub">src/opt</text>
+  <rect x="508" y="70" width="84" height="94" rx="9" fill="#ffffff" opacity=".35"/>
+  <text x="550" y="96" text-anchor="middle" class="title" style="font-size:13px">codegen</text>
+  <text x="550" y="114" text-anchor="middle" class="sub">SysV ABI</text>
+  <text x="550" y="130" text-anchor="middle" class="sub">peephole</text>
+  <text x="550" y="150" text-anchor="middle" class="sub">src/codegen</text>
+  <path d="M606 104 H640" class="arrow"/>
+  <text x="623" y="94" text-anchor="middle" class="io">.s</text>
+
+  <!-- assemble -->
+  <rect x="644" y="52" width="100" height="104" rx="12" fill="#5fd7d7"/>
+  <text x="694" y="92" text-anchor="middle" class="title">assemble</text>
+  <text x="694" y="116" text-anchor="middle" class="sub">GNU as</text>
+  <path d="M744 104 H768" class="arrow"/>
+  <text x="756" y="94" text-anchor="middle" class="io">.o</text>
+
+  <!-- link -->
+  <rect x="772" y="52" width="80" height="104" rx="12" fill="#ffaf5f"/>
+  <text x="812" y="92" text-anchor="middle" class="title">link</text>
+  <text x="812" y="116" text-anchor="middle" class="sub">ld, PIE</text>
+  <path d="M852 104 H874" class="arrow"/>
+  <text x="906" y="100" text-anchor="middle" class="io">a.out</text>
+  <text x="906" y="114" text-anchor="middle" class="io">ELF</text>
+</svg>

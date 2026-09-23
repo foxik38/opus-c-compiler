@@ -174,7 +174,35 @@ Other bugs worth remembering, each of which led to a design rule:
   *Rule:* check the function a call resolves to, then normalize known
   aliases.
 
-## 4. Things deliberately left out
+## 4. The second round: real code and a live display
+
+The first round's tests were all written by the same mind that wrote the
+compiler, so a second round went looking for bugs somewhere else: other
+people's code. Lua, SQLite (307k lines including its shell), Duktape, MuJS,
+Jim Tcl, zlib, bzip2, LZ4 and xxHash were built with occ at both levels and
+checked with their own test suites, or byte-for-byte against GCC builds;
+400 Csmith programs and an AddressSanitizer build of occ itself ran
+alongside. It paid off in exactly the places hand-written tests are weak:
+
+- **Mixed-sign overflow builtins.** `ckd_add(&unsigned_long, -1, 0)` said
+  "no overflow". The operands had been converted to the result's type
+  first; the fix computes the exact 128-bit result. It is now checked
+  against GCC for all 1536 combinations of operand and result types.
+- **False-positive warnings** from Lua: `(x = f()) >= y` is not "set but
+  not used", and a promoted `unsigned char` compared with `size_t` is not a
+  sign problem. The diagnostic tests became strict both ways, so any new
+  false positive now fails the suite.
+- **`__has_c_attribute` produced by a macro** inside `#if` (xxHash) was
+  rejected; such operators are now evaluated after expansion.
+- **`-rdynamic`** was missing, which Jim Tcl's plugin tests need.
+
+The live display followed the same rule as the rest: it must never cost
+correctness or machine-readability. The spinner runs on a helper thread only
+while a stage runs and only on a terminal; the first line of every
+diagnostic keeps GCC's format; and anything that is not a terminal gets the
+plain, line-per-stage output the test suite checks.
+
+## 5. Things deliberately left out
 
 Chosen to keep the compiler honest about what it does rather than half-doing
 it:
@@ -187,7 +215,7 @@ it:
 - **GNU statement expressions and extended `asm`** — only basic `asm("...")`.
 - **Other targets** — x86-64 Linux with glibc only, by design.
 
-## 5. If this were to go further
+## 6. If this were to go further
 
 - A small SSA-based register allocator would close most of the remaining gap
   to `gcc -O2` on call-heavy code like `fib`.

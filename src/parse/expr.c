@@ -762,11 +762,13 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
   Node *cur = &head;
   Type *param = ft->params;
   int argno = 0;
+  VEC(Token *) arg_toks = {};
   tok = tok->next;
   while (!tok_equal(tok, ")")) {
     if (argno)
       tok = tok_skip(tok, ",");
     Token *arg_tok = tok;
+    vec_push(&arg_toks, arg_tok);
     Node *arg = assign(&tok, tok);
     argno++;
     if (param) {
@@ -802,7 +804,7 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
       n->ret_buffer = new_temp(n->ty);
   }
   if (callee && is_format_function(callee->name))
-    check_format_call(n, format_function_name(callee->name));
+    check_format_call(n, format_function_name(callee->name), arg_toks.data);
   return n;
 }
 

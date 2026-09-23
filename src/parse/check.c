@@ -148,12 +148,12 @@ static Node *strip_casts(Node *n) {
   return n;
 }
 
-static void mismatch(Node *arg, const char *expected) {
-  warn_tok(W_FORMAT, arg->tok, "format specifies type '%s' but the argument has type '%s'", expected,
+static void mismatch(Node *arg, Token *at, const char *expected) {
+  warn_tok(W_FORMAT, at, "format specifies type '%s' but the argument has type '%s'", expected,
            type_name(strip_casts(arg)->ty));
 }
 
-static void check_printf_arg(Node *arg, char conv, LengthMod len) {
+static void check_printf_arg(Node *arg, Token *at, char conv, LengthMod len) {
   Type *ty = strip_casts(arg)->ty;
   if (arg->ty->kind == TY_DOUBLE && ty->kind == TY_FLOAT)
     ty = arg->ty; // float was promoted to double
@@ -163,38 +163,38 @@ static void check_printf_arg(Node *arg, char conv, LengthMod len) {
     bool is_unsigned = conv != 'd' && conv != 'i';
     Type *promoted = is_integer(ty) ? integer_promote(ty) : ty;
     if (!is_integer(ty) || promoted->size != int_size(len, false))
-      mismatch(arg, int_type_name(len, is_unsigned));
+      mismatch(arg, at, int_type_name(len, is_unsigned));
     return;
   }
   case 'c':
     if (!is_integer(ty))
-      mismatch(arg, len == LEN_L ? "wint_t" : "int");
+      mismatch(arg, at, len == LEN_L ? "wint_t" : "int");
     return;
   case 's':
     if (ty->kind != TY_PTR || !is_integer(ty->base) || ty->base->size != (len == LEN_L ? 4 : 1))
-      mismatch(arg, len == LEN_L ? "wchar_t *" : "char *");
+      mismatch(arg, at, len == LEN_L ? "wchar_t *" : "char *");
     return;
   case 'p':
     if (!is_pointer_like(ty))
-      mismatch(arg, "void *");
+      mismatch(arg, at, "void *");
     return;
   case 'n':
     if (ty->kind != TY_PTR || !is_integer(ty->base))
-      mismatch(arg, "int *");
+      mismatch(arg, at, "int *");
     return;
   case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A':
     if (!is_flonum(ty))
-      mismatch(arg, len == LEN_BIG_L ? "long double" : "double");
+      mismatch(arg, at, len == LEN_BIG_L ? "long double" : "double");
     return;
   default:
     return;
   }
 }
 
-static void check_scanf_arg(Node *arg, char conv, LengthMod len) {
+static void check_scanf_arg(Node *arg, Token *at, char conv, LengthMod len) {
   Type *ty = strip_casts(arg)->ty;
   if (ty->kind != TY_PTR) {
-    warn_tok(W_FORMAT, arg->tok, "format specifies a pointer but the argument has type '%s'", type_name(ty));
+    warn_tok(W_FORMAT, at, "format specifies a pointer but the argument has type '%s'", type_name(ty));
     return;
   }
   Type *base = ty->base;
@@ -202,20 +202,20 @@ static void check_scanf_arg(Node *arg, char conv, LengthMod len) {
   case 'd': case 'i': case 'u': case 'o': case 'x': case 'X': case 'n': {
     bool is_unsigned = conv != 'd' && conv != 'i' && conv != 'n';
     if (!is_integer(base) || base->size != int_size(len, true))
-      warn_tok(W_FORMAT, arg->tok, "format specifies type '%s *' but the argument has type '%s'",
+      warn_tok(W_FORMAT, at, "format specifies type '%s *' but the argument has type '%s'",
                int_type_name(len, is_unsigned), type_name(ty));
     return;
   }
   case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A': {
     int want = len == LEN_L || len == LEN_BIG_L ? 8 : 4;
     if (!is_flonum(base) || base->size != want)
-      warn_tok(W_FORMAT, arg->tok, "format specifies type '%s *' but the argument has type '%s'",
+      warn_tok(W_FORMAT, at, "format specifies type '%s *' but the argument has type '%s'",
                want == 8 ? "double" : "float", type_name(ty));
     return;
   }
   case 's': case 'c': case '[':
     if (!is_integer(base) || base->size != 1)
-      warn_tok(W_FORMAT, arg->tok, "format specifies type 'char *' but the argument has type '%s'",
+      warn_tok(W_FORMAT, at, "format specifies type 'char *' but the argument has type '%s'",
                type_name(ty));
     return;
   default:
@@ -223,13 +223,14 @@ static void check_scanf_arg(Node *arg, char conv, LengthMod len) {
   }
 }
 
-void check_format_call(Node *call, const char *name) {
+void check_format_call(Node *call, const char *name, Token **arg_toks) {
   bool is_scanf = strstr(name, "scanf") != nullptr;
   int fmt_index = format_index(name);
 
   Node *arg = call->args;
   for (int i = 0; i < fmt_index && arg; i++)
     arg = arg->next;
+  int next_index = fmt_index + 1; // index of `next` among the arguments
   if (!arg)
     return;
   Node *fmt = strip_casts(arg);
@@ -270,8 +271,9 @@ void check_format_call(Node *call, const char *name) {
           return;
         }
         if (!is_integer(strip_casts(next)->ty))
-          mismatch(next, "int");
+          mismatch(next, arg_toks[next_index], "int");
         next = next->next;
+        next_index++;
         p++;
       } else {
         while (*p >= '0' && *p <= '9')
@@ -317,12 +319,13 @@ void check_format_call(Node *call, const char *name) {
       return;
     }
     if (is_scanf)
-      check_scanf_arg(next, conv, len);
+      check_scanf_arg(next, arg_toks[next_index], conv, len);
     else
-      check_printf_arg(next, conv, len);
+      check_printf_arg(next, arg_toks[next_index], conv, len);
     next = next->next;
+    next_index++;
   }
 
   if (next && !is_scanf)
-    warn_tok(W_FORMAT, next->tok, "data argument not used by format string");
+    warn_tok(W_FORMAT, arg_toks[next_index], "data argument not used by format string");
 }
