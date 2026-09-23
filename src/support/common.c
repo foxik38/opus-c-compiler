@@ -46,6 +46,16 @@ char *vformat(const char *fmt, va_list ap) {
   return buf;
 }
 
+bool locale_is_utf8(void) {
+  const char *vars[] = {"LC_ALL", "LC_CTYPE", "LANG"};
+  for (size_t i = 0; i < ARRAY_LEN(vars); i++) {
+    const char *v = getenv(vars[i]);
+    if (v && *v)
+      return strstr(v, "UTF-8") || strstr(v, "utf8") || strstr(v, "UTF8") || strstr(v, "utf-8");
+  }
+  return false;
+}
+
 char *format(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);

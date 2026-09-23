@@ -10,6 +10,7 @@
 #define C_CYAN "\033[1;36m"
 #define C_GREEN "\033[1;32m"
 #define C_DIM "\033[2m"
+#define C_GUTTER "\033[38;5;75m"
 
 typedef struct {
   const char *name;
@@ -22,8 +23,32 @@ static const WarningInfo warning_info[W_COUNT] = {
 #undef X
 };
 
+// How to fix the problem, where one sentence can say it.
+static const char *const warning_help[W_COUNT] = {
+    [W_UNUSED_VARIABLE] = "remove it, or mark it [[maybe_unused]] if that is intended",
+    [W_UNUSED_FUNCTION] = "remove it, or mark it [[maybe_unused]] if that is intended",
+    [W_UNUSED_RESULT] = "use the result, or cast the call to (void) to discard it on purpose",
+    [W_UNINITIALIZED] = "give the variable a value where it is declared",
+    [W_PARENTHESES] = "use '==' to compare; if the assignment is intended, wrap it in parentheses",
+    [W_EMPTY_BODY] = "remove the ';', or write {} if an empty body is intended",
+    [W_DIV_BY_ZERO] = "check the divisor before dividing",
+    [W_SHIFT_COUNT] = "the count must be in 0 .. width-1; use a wider type or mask the count",
+    [W_ARRAY_BOUNDS] = "valid indexes run from 0 to length-1",
+    [W_RETURN_LOCAL_ADDR] = "the object dies with the function: return a copy, allocate it, or let the "
+                            "caller pass a buffer",
+    [W_RETURN_TYPE] = "return a value on every path, or declare the function void",
+    [W_FORMAT] = "make the conversion specifier match the argument type, or cast the argument",
+    [W_SIGN_COMPARE] = "a negative value converts to a huge unsigned one; check it is >= 0, then cast",
+    [W_INT_CONVERSION] = "add an explicit cast if the conversion is really intended",
+    [W_INCOMPATIBLE_POINTER] = "fix the pointed-to type, or cast explicitly if the conversion is intended",
+    [W_DISCARDED_QUALIFIERS] = "declare the target const/volatile as well",
+    [W_STRING_COMPARE] = "compare the characters with strcmp(a, b) == 0",
+    [W_SIZEOF_ARRAY_ARGUMENT] = "array parameters are pointers; pass the length as a separate argument",
+};
+
 static struct {
   bool color;
+  bool unicode;
   bool werror;
   bool suppress_warnings;
   bool disabled[W_COUNT];
@@ -35,6 +60,7 @@ static struct {
 
 void diag_configure(bool color, bool werror, bool suppress_warnings) {
   diag.color = color;
+  diag.unicode = locale_is_utf8();
   diag.werror = werror;
   diag.suppress_warnings = suppress_warnings;
 }
@@ -77,9 +103,11 @@ static void print_excerpt(StrBuf *sb, const SrcLoc *loc, const char *color) {
   while (*end && *end != '\n')
     end++;
 
-  sb_printf(sb, " %5d | ", loc->line);
+  // A colored gutter on terminals, GCC's plain "  12 | " layout elsewhere.
+  const char *bar = diag.color && diag.unicode ? "│" : "|";
+  sb_printf(sb, "%s %5d %s%s ", paint(C_GUTTER), loc->line, bar, paint(C_RESET));
   sb_append(sb, start, (size_t)(end - start));
-  sb_puts(sb, "\n       | ");
+  sb_printf(sb, "\n%s       %s%s ", paint(C_GUTTER), bar, paint(C_RESET));
 
   for (const char *p = start; p < loc->pos; p++) {
     if ((*p & 0xC0) == 0x80) // UTF-8 continuation byte occupies no column
@@ -129,6 +157,9 @@ bool diag_vreport(DiagLevel level, WarningId wid, const SrcLoc *loc, const char 
   sb_putc(sb, '\n');
   if (loc && loc->file && loc->pos)
     print_excerpt(sb, loc, level == DIAG_NOTE ? C_CYAN : C_GREEN);
+  if (wid < W_COUNT && warning_help[wid])
+    sb_printf(sb, "%s       %s%s %shelp:%s %s\n", paint(C_GUTTER), diag.color && diag.unicode ? "╰─" : "=",
+              paint(C_RESET), paint(C_CYAN), paint(C_RESET), warning_help[wid]);
 
   if (level == DIAG_ERROR)
     diag.errors++;

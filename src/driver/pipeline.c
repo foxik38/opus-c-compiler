@@ -167,6 +167,7 @@ static bool assemble(Build *b, const char *src, const char *input, int index) {
   StrVec cmd = assemble_command(src, obj);
   if (b->opts->verbose)
     report_command(join_argv(cmd.data));
+  report_stage_begin("assemble");
   ProcResult r;
   bool ok = run_process(cmd.data, &r);
   add_time(&b->total, r.time);
@@ -209,6 +210,7 @@ static bool compile_c_file(Build *b, const char *path, int index) {
   int w0 = diag_warning_count(), e0 = diag_error_count();
   PreprocessJob pj = {.path = path};
   Duration t;
+  report_stage_begin("preprocess");
   bool ok = guarded(do_preprocess, &pj, &t);
   add_time(&b->total, t);
   char *detail = ok ? format("%d %s, %d tokens, %d macro expansions", pj.stats.files,
@@ -230,6 +232,7 @@ static bool compile_c_file(Build *b, const char *path, int index) {
   char *asm_path = output_name(b, path, ".s", index);
   CodegenJob gen_job = {.path = asm_path, .optimize = optimize};
 
+  report_stage_begin("compile");
   ok = guarded(do_parse, &parse_job, &tp);
   if (ok && optimize) {
     opt_job.prog = parse_job.prog;
@@ -285,6 +288,7 @@ static bool link_executable(Build *b, const char *output) {
   StrVec cmd = link_command(&job, &driver);
   if (o->verbose)
     report_command(join_argv(cmd.data));
+  report_stage_begin("link");
   ProcResult r;
   bool ok = run_process(cmd.data, &r);
   add_time(&b->total, r.time);
@@ -353,7 +357,7 @@ static void setup_preprocessor(Build *b) {
 
 int run_pipeline(Options *opts) {
   diag_configure(opts->color, opts->werror, opts->no_warnings);
-  report_init(!opts->quiet, opts->color);
+  report_init(!opts->quiet, opts->color, !opts->verbose);
 
   Build b = {.opts = opts, .tmpdir = make_temp_dir()};
   setup_preprocessor(&b);

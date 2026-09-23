@@ -13,10 +13,11 @@
 
 typedef enum { STATUS_OK, STATUS_WARN, STATUS_ERR } StageStatus;
 
-void report_init(bool enabled, bool color);
+void report_init(bool enabled, bool color, bool animate);
 bool report_enabled(void);
 void report_header(const char *opt_level, const char *target);
 void report_file(const char *path);
+void report_stage_begin(const char *name); // live spinner until report_stage()
 void report_stage(const char *name, StageStatus status, Duration time, const char *detail);
 void report_substage(const char *name, bool last, Duration time, const char *detail);
 void report_command(const char *cmdline); // -v

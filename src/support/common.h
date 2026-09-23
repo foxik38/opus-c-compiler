@@ -35,6 +35,7 @@
 #define ICE_UNREACHABLE() panic("unreachable code reached at %s:%d", __FILE__, __LINE__)
 
 bool starts_with(const char *s, const char *prefix);
+bool locale_is_utf8(void); // LC_ALL / LC_CTYPE / LANG name a UTF-8 locale
 bool ends_with(const char *s, const char *suffix);
 int64_t align_to(int64_t n, int64_t align);
 bool is_power_of_two(uint64_t n);
