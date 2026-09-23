@@ -702,9 +702,17 @@ static int count_params(Type *ft) {
   return n;
 }
 
+// glibc maps scanf to __isoc99_scanf/__isoc23_scanf with macros.
+static const char *format_function_name(const char *name) {
+  if (starts_with(name, "__isoc99_") || starts_with(name, "__isoc23_"))
+    return name + 9;
+  return name;
+}
+
 static bool is_format_function(const char *name) {
   static const char *const names[] = {"printf", "fprintf", "sprintf", "snprintf", "dprintf",
                                       "scanf",  "fscanf",  "sscanf"};
+  name = format_function_name(name);
   for (size_t i = 0; i < ARRAY_LEN(names); i++)
     if (strcmp(name, names[i]) == 0)
       return true;
@@ -765,7 +773,7 @@ static Node *funcall(Token **rest, Token *tok, Node *fn) {
       n->ret_buffer = new_temp(n->ty);
   }
   if (callee && is_format_function(callee->name))
-    check_format_call(n, callee->name);
+    check_format_call(n, format_function_name(callee->name));
   return n;
 }
 

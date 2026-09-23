@@ -70,6 +70,11 @@ static bool guarded(StageFn *fn, void *ctx, Duration *time) {
   return ok && diag_error_count() == errors_before;
 }
 
+static char *failure_detail(int errors_before) {
+  int n = diag_error_count() - errors_before;
+  return format("%d %s", n, plural(n, "error", "errors"));
+}
+
 static StageStatus status_of(bool ok, int warnings_before) {
   if (!ok)
     return STATUS_ERR;
@@ -199,14 +204,14 @@ static bool compile_c_file(Build *b, const char *path, int index) {
   preproc_init(&b->pp);
 
   // 1. Preprocess.
-  int w0 = diag_warning_count();
+  int w0 = diag_warning_count(), e0 = diag_error_count();
   PreprocessJob pj = {.path = path};
   Duration t;
   bool ok = guarded(do_preprocess, &pj, &t);
   add_time(&b->total, t);
   char *detail = ok ? format("%d %s, %d tokens, %d macro expansions", pj.stats.files,
                              plural(pj.stats.files, "file", "files"), pj.stats.tokens, pj.stats.expansions)
-                    : nullptr;
+                    : failure_detail(e0);
   report_stage("preprocess", status_of(ok, w0), t, detail);
   diag_flush();
   if (!ok)
@@ -216,6 +221,7 @@ static bool compile_c_file(Build *b, const char *path, int index) {
 
   // 2. Compile: parse and check, optimize, generate assembly.
   w0 = diag_warning_count();
+  e0 = diag_error_count();
   Duration tp = {}, to = {}, tg = {};
   ParseJob parse_job = {.tok = pj.tok};
   OptimizeJob opt_job = {};
@@ -240,7 +246,7 @@ static bool compile_c_file(Build *b, const char *path, int index) {
   detail = ok ? format("%d %s, %d %s, %d instructions", prog->functions,
                        plural(prog->functions, "function", "functions"), prog->variables,
                        plural(prog->variables, "global", "globals"), gen_job.stats.instructions)
-              : nullptr;
+              : failure_detail(e0);
   report_stage("compile", status_of(ok, w0), tc, detail);
   if (ok) {
     report_substage("parse+check", false, tp, "typed AST");
