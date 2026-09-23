@@ -1110,49 +1110,76 @@ static void gen_logical(Node *node) {
   emit_label("%s", end);
 }
 
+// __builtin_{add,sub,mul}_overflow: the result is computed as if with
+// infinite precision. Both operands arrive as 64-bit values that keep their
+// own signedness; the exact result is formed as a 128-bit value in
+// %rdx:%rax, and the flag says whether it fits the result type.
 static void gen_overflow(Node *node) {
   Type *rt = node->cond->ty->base;
+  bool sa = !node->lhs->ty->is_unsigned, sb = !node->rhs->ty->is_unsigned;
   gen_expr(node->cond);
   push();
   gen_expr(node->rhs);
   push();
   gen_expr(node->lhs);
-  pop("%rdi");
+  pop("%rdi"); // %rax = a, %rdi = b
 
-  bool u = rt->is_unsigned;
-  switch (node->val) {
-  case ND_ADD:
-    emit("add %%rdi, %%rax");
-    emit(u ? "setc %%cl" : "seto %%cl");
-    break;
-  case ND_SUB:
-    emit("sub %%rdi, %%rax");
-    emit(u ? "setc %%cl" : "seto %%cl");
-    break;
-  default:
-    if (u) {
-      emit("mul %%rdi");
-      emit("seto %%cl");
-    } else {
-      emit("imul %%rdi, %%rax");
-      emit("seto %%cl");
-    }
-    break;
-  }
-  // The exact result must also fit the (possibly narrower) result type.
-  if (rt->size < 8) {
-    if (u) {
+  if (node->val == ND_ADD || node->val == ND_SUB) {
+    // Extend both operands to 128 bits (before the flags are needed).
+    if (sa) {
       emit("mov %%rax, %%rdx");
-      emit("shr $%d, %%rdx", rt->size * 8);
-      emit("test %%rdx, %%rdx");
+      emit("sar $63, %%rdx");
     } else {
-      static const char *sext[] = {[1] = "movsbq %al, %rdx", [2] = "movswq %ax, %rdx",
-                                   [4] = "movslq %eax, %rdx"};
-      emit("%s", sext[rt->size]);
-      emit("cmp %%rax, %%rdx");
+      emit("xor %%edx, %%edx");
     }
-    emit("setne %%dl");
-    emit("or %%dl, %%cl");
+    if (sb) {
+      emit("mov %%rdi, %%rcx");
+      emit("sar $63, %%rcx");
+    } else {
+      emit("xor %%ecx, %%ecx");
+    }
+    bool add = node->val == ND_ADD;
+    emit("%s %%rdi, %%rax", add ? "add" : "sub");
+    emit("%s %%rcx, %%rdx", add ? "adc" : "sbb");
+  } else if (sa && sb) {
+    emit("imul %%rdi"); // signed 128-bit product
+  } else if (!sa && !sb) {
+    emit("mul %%rdi"); // unsigned 128-bit product (its high half is never all ones)
+  } else {
+    // Mixed signs: unsigned product, then subtract the unsigned operand from
+    // the high half if the signed one is negative.
+    emit("mov %%rax, %%rsi");
+    emit("mul %%rdi");
+    emit("mov %s, %%rcx", sa ? "%rsi" : "%rdi");
+    emit("sar $63, %%rcx");
+    emit("and %s, %%rcx", sa ? "%rdi" : "%rsi");
+    emit("sub %%rcx, %%rdx");
+  }
+
+  // Does the 128-bit value fit the result type?
+  int bits = rt->size * 8;
+  if (rt->is_unsigned) {
+    emit("test %%rdx, %%rdx");
+    emit("setne %%cl");
+    if (bits < 64) {
+      emit("mov %%rax, %%rsi");
+      emit("shr $%d, %%rsi", bits);
+      emit("setne %%dl");
+      emit("or %%dl, %%cl");
+    }
+  } else {
+    emit("mov %%rax, %%rcx");
+    emit("sar $63, %%rcx");
+    emit("cmp %%rcx, %%rdx");
+    emit("setne %%cl");
+    if (bits < 64) {
+      static const char *sext[] = {[1] = "movsbq %al, %rsi", [2] = "movswq %ax, %rsi",
+                                   [4] = "movslq %eax, %rsi"};
+      emit("%s", sext[rt->size]);
+      emit("cmp %%rax, %%rsi");
+      emit("setne %%dl");
+      emit("or %%dl, %%cl");
+    }
   }
   pop("%rdi");
   emit("mov %s, (%%rdi)", reg_ax(rt->size));

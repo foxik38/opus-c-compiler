@@ -171,5 +171,23 @@ int main(void) {
   ASSERT(-1, '\xff');
   ASSERT(0x41, '\101');
 
+  // Overflow builtins compute the exact result: operands keep their own
+  // signedness, whatever the result type is (found by review).
+  unsigned long uo;
+  long so;
+  unsigned uo32;
+  ASSERT(1, __builtin_add_overflow(-1, 0, &uo));             // -1 is not representable
+  ASSERT(0, __builtin_add_overflow(-1, 1, &uo));             // exact result 0
+  ASSERT(0, uo);
+  ASSERT(0, __builtin_add_overflow(ULONG_MAX, -1, &uo));     // exact ULONG_MAX - 1
+  ASSERT(1, __builtin_add_overflow(ULONG_MAX, 0, &so));      // too large for long
+  ASSERT(0, __builtin_mul_overflow(-1, -1, &uo32));          // exact 1
+  ASSERT(1, uo32);
+  ASSERT(0, __builtin_mul_overflow(LONG_MIN, -1, &uo));      // exact 2^63 fits
+  ASSERT(1, __builtin_mul_overflow(ULONG_MAX, -1, &so));      // -ULONG_MAX does not fit
+  ASSERT(1, __builtin_sub_overflow(LONG_MIN, 1u, &uo));      // negative
+  ASSERT(0, __builtin_sub_overflow(0, LONG_MIN, &uo));       // exact 2^63
+  ASSERT(0, __builtin_add_overflow((unsigned long)LONG_MAX + 1, -1, &so));
+
   return test_done();
 }

@@ -1417,10 +1417,11 @@ static Node *builtin_call(Token **rest, Token *tok, bool *handled) {
     if (res->ty->kind != TY_PTR || !is_integer(res->ty->base) || res->ty->base->kind == TY_BOOL ||
         res->ty->base->kind == TY_ENUM || res->ty->base->is_const)
       error_tok(res_tok, "result argument must be a pointer to a modifiable integer");
-    Type *rt = res->ty->base;
-    // Operands are evaluated in the (64-bit) domain of the result's signedness.
-    Type *wide = rt->is_unsigned ? ty_ulong : ty_long;
-    Node *n = new_binary(ND_OVERFLOW, implicit_cast(a, wide), implicit_cast(b, wide), start);
+    // The result is exact (infinite precision): each operand is widened to
+    // 64 bits without changing its value, keeping its own signedness.
+    Node *wa = implicit_cast(a, integer_promote(a->ty)->is_unsigned ? ty_ulong : ty_long);
+    Node *wb = implicit_cast(b, integer_promote(b->ty)->is_unsigned ? ty_ulong : ty_long);
+    Node *n = new_binary(ND_OVERFLOW, wa, wb, start);
     n->cond = res;
     n->val = op;
     n->ty = ty_bool;
