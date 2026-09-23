@@ -1,0 +1,16 @@
+name: Feature request
+description: A C feature, warning or tool improvement you would like occ to have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like occ to do?
+      description: For language features, a short example program helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it solves, or where you ran into it.

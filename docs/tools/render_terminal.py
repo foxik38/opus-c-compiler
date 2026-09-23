@@ -7,19 +7,27 @@ The capture is what a terminal received, e.g. from
     script -qfc "occ -o prod life.c" capture.txt
 Carriage returns and "erase line" sequences are replayed, so a live display
 (spinners redrawn in place) ends up as its final text. With --animate, the
-command is typed out and the lines appear one after another, looping.
+command is typed out and every line sweeps in smoothly from the left, one
+after another, looping (smoother than a real terminal, on purpose).
 """
 import argparse
 import html
 import re
 
-PALETTE_16 = ["#1e1e2e", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#bac2de",
-              "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#cdd6f4"]
-FOREGROUND = "#cdd6f4"
-BACKGROUND = "#1e1e2e"
+# Pitch black, grays and white, with pastel accents (the occ image theme).
+PALETTE_16 = ["#0a0a0a", "#ffadc6", "#b5f0c8", "#ffe3a8", "#a8c8ff", "#d4c1ff", "#a6ecec", "#d4d4d4",
+              "#525252", "#ffadc6", "#b5f0c8", "#ffe3a8", "#a8c8ff", "#d4c1ff", "#a6ecec", "#fafafa"]
+# occ's stage colors (256-color codes) mapped to the same pastels.
+STAGE_COLORS = {177: "#d4c1ff", 75: "#a8c8ff", 80: "#a6ecec", 215: "#ffd1a8"}
+FOREGROUND = "#f5f5f5"
+BACKGROUND = "#000000"
+CHROME = "#0d0d0d"
+BORDER = "#262626"
 
 
 def color_256(n):
+    if n in STAGE_COLORS:
+        return STAGE_COLORS[n]
     if n < 16:
         return PALETTE_16[n]
     if n < 232:
@@ -106,49 +114,80 @@ def spans(line):
     return [(key, "".join(chars)) for key, chars in runs]
 
 
+def line_text(row):
+    return "".join(ch for ch, _ in row)
+
+
 def render(lines, title, command, animate):
-    char_w, line_h, pad = 8.4, 19, 18
-    top = 44
-    rows = ([("$ ", command)] if command else []) + lines
-    width = int(max(len(r[1]) + 2 if isinstance(r, tuple) else len(r) for r in rows) * char_w + 2 * pad)
-    width = max(width, 520)
+    char_w, line_h, pad = 8.4, 20, 22
+    top = 56
+    rows = ([None] if command else []) + lines
+    longest = max([len(command) + 2] + [len(r) for r in lines])
+    width = max(int(longest * char_w + 2 * pad), 560)
     height = top + len(rows) * line_h + pad
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="{width}" height="{height}" viewBox="0 0 {width} {height}">']
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="{width}" height="{height}" '
+           f'viewBox="0 0 {width} {height}">']
     out.append("<style>")
     out.append("text{font-family:'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace;"
                "font-size:14px;white-space:pre;fill:%s}" % FOREGROUND)
-    out.append(".b{font-weight:700}.d{opacity:.62}")
+    out.append(".b{font-weight:700}.d{opacity:.55}")
+
+    # Smooth animation: every line sweeps in from the left with an ease-out
+    # curve, one after another; the whole screen fades out and the loop restarts.
+    timeline = []
     if animate:
-        n = len(rows)
-        cycle = 2.2 + 0.28 * n + 4.0
-        for k in range(n):
-            start = (0.0 if (command and k == 0) else 1.6 + 0.28 * k) / cycle * 100
-            out.append(f"@keyframes l{k}{{0%,{start:.2f}%{{opacity:0}}{start + 0.01:.2f}%,97%{{opacity:1}}100%{{opacity:0}}}}")
-            out.append(f".l{k}{{animation:l{k} {cycle:.2f}s steps(1) infinite}}")
-        if command:
-            cw = len(command) * char_w
-            type_end = 1.4 / cycle * 100
-            out.append(f"@keyframes type{{0%{{width:0}}{type_end:.2f}%,100%{{width:{cw:.1f}px}}}}")
-            out.append(f".typing{{animation:type {cycle:.2f}s steps({len(command)}) infinite}}")
+        t = 0.3
+        for k, row in enumerate(rows):
+            n = len(command) + 2 if row is None else max(len(row), 1)
+            dur = 1.1 if row is None else min(0.18 + n * 0.0045, 0.55)
+            timeline.append((t, dur))
+            t += dur + (0.35 if row is None else 0.07)
+        hold = 3.5
+        cycle = t + hold
+        for k, (start, dur) in enumerate(timeline):
+            a, b = start / cycle * 100, (start + dur) / cycle * 100
+            out.append(f"@keyframes s{k}{{0%,{a:.2f}%{{transform:scaleX(0)}}{b:.2f}%,100%{{transform:scaleX(1)}}}}")
+            ease = "cubic-bezier(.45,0,.55,1)" if rows[k] is None else "cubic-bezier(.2,.8,.2,1)"
+            out.append(f".s{k}{{transform-box:fill-box;transform-origin:0 0;"
+                       f"animation:s{k} {cycle:.2f}s {ease} infinite}}")
+        fade = (cycle - 0.6) / cycle * 100
+        out.append(f"@keyframes all{{0%,{fade:.2f}%{{opacity:1}}100%{{opacity:0}}}}")
+        out.append(f".all{{animation:all {cycle:.2f}s ease-in infinite}}")
+        caret_end = (timeline[0][0] + timeline[0][1]) / cycle * 100 if command else 0
+        out.append(f"@keyframes caret{{0%,{caret_end:.2f}%{{opacity:1}}{caret_end + 0.1:.2f}%,100%{{opacity:0}}}}")
+        out.append(f".caret{{animation:caret {cycle:.2f}s steps(1) infinite}}")
     out.append("</style>")
-    out.append(f'<rect width="{width}" height="{height}" rx="10" fill="{BACKGROUND}"/>')
-    out.append(f'<rect width="{width}" height="30" rx="10" fill="#181825"/><rect y="20" width="{width}" height="10" fill="#181825"/>')
-    for k, color in enumerate(["#f38ba8", "#f9e2af", "#a6e3a1"]):
-        out.append(f'<circle cx="{18 + 20 * k}" cy="15" r="6" fill="{color}"/>')
+
+    # Window: pitch black body, a slightly lighter title bar, a hairline border.
+    out.append(f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="12" fill="{BACKGROUND}" '
+               f'stroke="{BORDER}"/>')
+    out.append(f'<path d="M0.5 12.5a12 12 0 0 1 12-12h{width - 25}a12 12 0 0 1 12 12v22h-{width - 1}z" fill="{CHROME}"/>')
+    out.append(f'<line x1="0.5" y1="34.5" x2="{width - 0.5}" y2="34.5" stroke="{BORDER}"/>')
+    for k, color in enumerate(["#3a3a3a", "#3a3a3a", "#3a3a3a"]):
+        out.append(f'<circle cx="{20 + 18 * k}" cy="17.5" r="5.5" fill="{color}"/>')
     if title:
-        out.append(f'<text x="{width / 2}" y="20" text-anchor="middle" class="d" style="font-size:12px">{html.escape(title)}</text>')
+        out.append(f'<text x="{width / 2}" y="22" text-anchor="middle" style="font-size:12px;fill:#8a8a8a">'
+                   f'{html.escape(title)}</text>')
+
+    if animate:
+        out.append("<defs>")
+        y = top
+        for k in range(len(rows)):
+            out.append(f'<clipPath id="c{k}"><rect class="s{k}" x="{pad - 2}" y="{y - 15}" width="{width - 2 * pad + 4}" '
+                       f'height="{line_h}"/></clipPath>')
+            y += line_h
+        out.append("</defs>")
+        out.append('<g class="all">')
 
     y = top
     for k, row in enumerate(rows):
-        cls = f' class="l{k}"' if animate else ""
-        if command and k == 0:
-            prompt_x = pad + 2 * char_w
-            clip = ""
+        clip = f' clip-path="url(#c{k})"' if animate else ""
+        if row is None:
+            out.append(f'<g{clip}><text x="{pad}" y="{y}" class="b" style="fill:#a8c8ff">$</text>'
+                       f'<text x="{pad + 2 * char_w}" y="{y}">{html.escape(command)}</text></g>')
             if animate:
-                out.append(f'<defs><clipPath id="c"><rect class="typing" x="{prompt_x}" y="{y - 15}" height="{line_h}" width="0"/></clipPath></defs>')
-                clip = ' clip-path="url(#c)"'
-            out.append(f'<text x="{pad}" y="{y}" style="fill:#a6e3a1" class="b">$</text>')
-            out.append(f'<text x="{prompt_x}" y="{y}"{clip}>{html.escape(command)}</text>')
+                cx = pad + (len(command) + 2) * char_w + 2
+                out.append(f'<rect class="caret" x="{cx:.1f}" y="{y - 13}" width="8" height="16" fill="#a8c8ff" opacity=".8"/>')
         else:
             parts = []
             col = 0
@@ -163,8 +202,10 @@ def render(lines, title, command, animate):
                 if fg:
                     attrs.append(f'style="fill:{fg}"')
                 parts.append(f'<tspan {" ".join(attrs)}>{html.escape(s)}</tspan>')
-            out.append(f'<text x="{pad}" y="{y}"{cls}>{"".join(parts)}</text>')
+            out.append(f'<text x="{pad}" y="{y}"{clip}>{"".join(parts)}</text>')
         y += line_h
+    if animate:
+        out.append("</g>")
     out.append("</svg>")
     return "\n".join(out) + "\n"
 

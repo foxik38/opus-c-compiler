@@ -9,7 +9,7 @@ printed next to every bar. Shorter is faster.
 """
 import sys
 
-COLORS = {"occ -o none": "#7f849c", "occ -o prod": "#89b4fa", "gcc -O0": "#f9e2af", "gcc -O2": "#a6e3a1"}
+COLORS = {"occ -o none": "#525252", "occ -o prod": "#a8c8ff", "gcc -O0": "#ffd1a8", "gcc -O2": "#b5f0c8"}
 
 
 def parse(path):
@@ -35,21 +35,24 @@ def main():
     width = left + bar_w + 110
     font = "font-family=\"'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace\""
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-           f'<rect width="{width}" height="{height}" rx="14" fill="#1e1e2e"/>']
+           f'<rect x="1" y="1" width="{width - 2}" height="{height - 2}" rx="16" fill="#000000" stroke="#262626" stroke-width="2"/>']
     x = 24
     for name in header:
         out.append(f'<rect x="{x}" y="18" width="14" height="14" rx="3" fill="{COLORS.get(name, "#cdd6f4")}"/>')
-        out.append(f'<text x="{x + 20}" y="30" {font} font-size="13" fill="#cdd6f4">{name}</text>')
+        out.append(f'<text x="{x + 20}" y="30" {font} font-size="13" fill="#f5f5f5">{name}</text>')
         x += 20 + len(name) * 8 + 28
     y = legend_h + 8
     for bench, times in rows:
         slowest = max(times)
         out.append(f'<text x="24" y="{y + len(header) * (bar_h + gap) / 2 + 4}" {font} font-size="14" '
-                   f'font-weight="700" fill="#cdd6f4">{bench}</text>')
+                   f'font-weight="700" fill="#ffffff">{bench}</text>')
+        # A dark blue track behind each group: the scale of that benchmark.
+        track_h = len(header) * (bar_h + gap) - gap
+        out.append(f'<rect x="{left}" y="{y}" width="{bar_w}" height="{track_h}" rx="5" fill="#0b1535" opacity=".55"/>')
         for name, t in zip(header, times):
             w = max(2, t / slowest * bar_w)
             out.append(f'<rect x="{left}" y="{y}" width="{w:.1f}" height="{bar_h}" rx="3" fill="{COLORS.get(name, "#cdd6f4")}"/>')
-            out.append(f'<text x="{left + w + 8:.1f}" y="{y + bar_h - 2}" {font} font-size="11.5" fill="#a6adc8">{t:.3f} s</text>')
+            out.append(f'<text x="{left + w + 8:.1f}" y="{y + bar_h - 2}" {font} font-size="11.5" fill="#a3a3a3">{t:.3f} s</text>')
             y += bar_h + gap
         y += group_gap
     out.append("</svg>")
