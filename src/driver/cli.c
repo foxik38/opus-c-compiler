@@ -34,6 +34,7 @@ static void usage(FILE *out) {
         "  -l <lib>          Link with a library (libm is linked automatically)\n"
         "  -L <dir>          Add a library search directory\n"
         "  --static          Produce a statically linked executable\n"
+        "  -rdynamic         Export all symbols (for plugins loaded with dlopen)\n"
         "\n"
         "Diagnostics:\n"
         "  -w                Suppress all warnings\n"
@@ -126,6 +127,8 @@ Options parse_args(int argc, char **argv) {
       o.keep = true;
     } else if (strcmp(a, "--static") == 0) {
       o.is_static = true;
+    } else if (strcmp(a, "-rdynamic") == 0) {
+      o.export_dynamic = true;
     } else if (starts_with(a, "-iquote")) {
       vec_push(&o.quote_dirs, take_value(argc, argv, &i, "-iquote"));
     } else if (starts_with(a, "-I")) {

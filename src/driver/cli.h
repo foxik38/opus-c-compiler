@@ -33,6 +33,7 @@ typedef struct {
   bool werror;
   bool no_warnings; // -w
   bool is_static;   // --static
+  bool export_dynamic; // -rdynamic
 } Options;
 
 // Parses argv; exits with a message on invalid usage.

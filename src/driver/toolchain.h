@@ -23,6 +23,7 @@ typedef struct {
   StrVec lib_dirs;
   const char *output;
   bool is_static;
+  bool export_dynamic; // -rdynamic: symbols visible to dlopen()ed libraries
 } LinkJob;
 
 // Builds the linker command line. Uses ld directly with the C runtime

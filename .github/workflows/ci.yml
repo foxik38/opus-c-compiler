@@ -26,6 +26,11 @@ jobs:
       - name: Differential fuzzing against GCC
         run: make fuzz FUZZ_COUNT=200
 
+      - name: Differential testing with Csmith programs
+        run: |
+          sudo apt-get install -y --no-install-recommends csmith libcsmith-dev
+          python3 tests/fuzz/csmith.py --count 40
+
       - name: Build and run the examples
         run: |
           for e in hello c23_tour life mandelbrot; do
@@ -38,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-failures
-          path: tests/out/fuzz-fail-*.c
+          path: tests/out/*-fail-*.c
           if-no-files-found: ignore

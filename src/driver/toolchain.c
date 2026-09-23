@@ -226,6 +226,8 @@ static StrVec cc_fallback(const LinkJob *job) {
   vec_push(&v, (char *)job->output);
   if (job->is_static)
     vec_push(&v, "-static");
+  if (job->export_dynamic)
+    vec_push(&v, "-rdynamic");
   push_all(&v, &job->lib_dirs, "-L");
   push_all(&v, &job->objects, nullptr);
   push_all(&v, &job->libs, "-l");
@@ -266,6 +268,8 @@ StrVec link_command(const LinkJob *job, const char **driver_name) {
   }
   vec_push(&v, "-z");
   vec_push(&v, "noexecstack");
+  if (job->export_dynamic)
+    vec_push(&v, "--export-dynamic");
   vec_push(&v, "-o");
   vec_push(&v, (char *)job->output);
 

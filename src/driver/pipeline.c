@@ -279,6 +279,7 @@ static bool link_executable(Build *b, const char *output) {
       .lib_dirs = o->lib_dirs,
       .output = output,
       .is_static = o->is_static,
+      .export_dynamic = o->export_dynamic,
   };
   const char *driver;
   StrVec cmd = link_command(&job, &driver);
