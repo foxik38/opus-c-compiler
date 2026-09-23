@@ -221,8 +221,8 @@ static int layout_frame(Obj *fn) {
     fn->ret_ptr->offset = -offset;
   }
   for (Obj *var = fn->locals; var; var = var->next) {
-    if (var->reg >= 0)
-      continue;
+    if (is_gp_reg_var(var))
+      continue; // XMM variables keep a home slot for spilling around calls
     int align = MAX(var->align, var->ty->kind == TY_STRUCT || var->ty->kind == TY_UNION ? 8 : 1);
     offset = (int)align_to(offset + slot_size(var->ty), MIN(align, 16));
     var->offset = -offset;
@@ -240,6 +240,7 @@ void gen_function(Obj *fn) {
 
   cg.fn = fn;
   cg.depth = 0;
+  cg.temp_depth = 0;
   cg.used_regs = 0;
   for (Obj *var = fn->locals; var; var = var->next)
     var->reg = -1;

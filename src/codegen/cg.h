@@ -16,6 +16,7 @@ typedef struct {
   bool optimize;
   Obj *fn;          // function being generated
   int depth;        // 8-byte slots currently pushed (keeps calls 16-byte aligned)
+  int temp_depth;   // scratch registers holding intermediate values (-o prod)
   int label_seq;    // codegen-local labels (.L.cg.N)
   uint8_t used_regs; // callee-saved registers used by the current function
   StrVec lines;
@@ -76,9 +77,13 @@ void gen_function(Obj *fn);
 void emit_data(Program *prog);
 
 // regalloc.c
-enum { NUM_CALLEE_SAVED = 5 };
+enum { NUM_CALLEE_SAVED = 5, NUM_XMM_VARS = 4 };
 void promote_locals(Obj *fn);
 const char *callee_reg(int reg, int size);
+bool is_gp_reg_var(const Obj *var); // lives in %rbx/%r12-%r15
+bool is_xmm_var(const Obj *var);    // lives in %xmm12-%xmm15
+const char *xmm_var_reg(const Obj *var);
+void spill_xmm_vars(bool reload); // around calls: XMM registers are caller-saved
 
 // peephole.c
 int peephole(StrVec *lines);

@@ -46,6 +46,20 @@ char *symbol_ref(Obj *var) { return format("%s(%%rip)", var->name); }
 
 static bool is_int_or_ptr(const Type *ty) { return is_integer(ty) || is_pointer_like(ty); }
 
+// A memory operand: disp(base, index, scale) or sym+disp(%rip).
+typedef struct {
+  const char *base;
+  const char *index;
+  int scale;
+  int64_t disp;
+  const char *sym;
+} Mem;
+
+static void lvalue_mem(Node *lv, Mem *m);
+static void pointer_mem(Node *p, Mem *m);
+static void lea_mem(const Mem *m);
+static bool gen_cast_of_var(Node *node);
+
 // ---------------------------------------------------------------------------
 // Addresses, loads and stores
 // ---------------------------------------------------------------------------
@@ -78,6 +92,12 @@ void gen_addr(Node *node) {
     return;
   }
   case ND_DEREF:
+    if (cg.optimize) {
+      Mem m;
+      pointer_mem(node->lhs, &m);
+      lea_mem(&m);
+      return;
+    }
     gen_expr(node->lhs);
     return;
   case ND_COMMA:
@@ -85,6 +105,12 @@ void gen_addr(Node *node) {
     gen_addr(node->rhs);
     return;
   case ND_MEMBER:
+    if (cg.optimize) {
+      Mem m;
+      lvalue_mem(node, &m);
+      lea_mem(&m);
+      return;
+    }
     gen_addr(node->lhs);
     if (node->member->offset)
       emit("add $%d, %%rax", node->member->offset);
@@ -434,6 +460,205 @@ static void gen_bitfield_store(Node *node) {
 }
 
 // ---------------------------------------------------------------------------
+// Temporaries and addressing modes (-o prod)
+// ---------------------------------------------------------------------------
+
+// Up to four intermediate values live in scratch registers instead of on the
+// stack. A temporary may only be live while a side-effect-free expression is
+// evaluated: such code never calls functions, copies structs or stores
+// bit-fields, the only other users of these registers.
+enum { MAX_TEMPS = 4 };
+
+static const char *const int_temps[MAX_TEMPS][4] = {
+    {"%r11b", "%r11w", "%r11d", "%r11"},
+    {"%r10b", "%r10w", "%r10d", "%r10"},
+    {"%r9b", "%r9w", "%r9d", "%r9"},
+    {"%r8b", "%r8w", "%r8d", "%r8"},
+};
+static const char *const fp_temps[MAX_TEMPS] = {"%xmm8", "%xmm9", "%xmm10", "%xmm11"};
+
+static const char *int_temp(int t, int size) {
+  return int_temps[t][size == 1 ? 0 : size == 2 ? 1 : size == 4 ? 2 : 3];
+}
+
+static bool can_use_temp(Node *evaluated_later) {
+  return cg.optimize && cg.temp_depth < MAX_TEMPS && !has_side_effects(evaluated_later);
+}
+
+// Moves %rax (or %xmm0) into a new temporary and returns its index.
+static int save_temp(bool fp) {
+  int t = cg.temp_depth++;
+  if (fp)
+    emit("movapd %%xmm0, %s", fp_temps[t]);
+  else
+    emit("mov %%rax, %s", int_temp(t, 8));
+  return t;
+}
+
+static void release_temp(void) { cg.temp_depth--; }
+
+static char *mem_str(const Mem *m) {
+  if (m->sym)
+    return m->disp ? format("%s%+lld(%%rip)", m->sym, (long long)m->disp) : format("%s(%%rip)", m->sym);
+  const char *disp = m->disp ? format("%lld", (long long)m->disp) : "";
+  if (m->index)
+    return format("%s(%s,%s,%d)", disp, m->base, m->index, m->scale);
+  return format("%s(%s)", disp, m->base);
+}
+
+// Leaves the value of a in %rax and of b in %rdi (both 8 bytes wide).
+static void gen_pair(Node *a, Node *b) {
+  const char *src = simple_operand(b, 8);
+  if (src) {
+    gen_expr(a);
+    emit("mov %s, %%rdi", src);
+    return;
+  }
+  if (can_use_temp(a)) {
+    gen_expr(b);
+    int t = save_temp(false);
+    gen_expr(a);
+    emit("mov %s, %%rdi", int_temp(t, 8));
+    release_temp();
+    return;
+  }
+  gen_expr(b);
+  push();
+  gen_expr(a);
+  pop("%rdi");
+}
+
+// Computes as little as needed of the address of lvalue `lv` and describes
+// the rest as an addressing mode.
+static void lvalue_mem(Node *lv, Mem *m) {
+  *m = (Mem){};
+  switch (lv->kind) {
+  case ND_VAR: {
+    Obj *var = lv->var;
+    if (var->is_local && var->reg < 0) {
+      m->base = "%rbp";
+      m->disp = var->offset;
+      return;
+    }
+    if (!var->is_local && !var->is_tls && is_local_symbol(var)) {
+      m->sym = var->name;
+      return;
+    }
+    break;
+  }
+  case ND_MEMBER:
+    lvalue_mem(lv->lhs, m);
+    m->disp += lv->member->offset;
+    return;
+  case ND_DEREF:
+    pointer_mem(lv->lhs, m);
+    return;
+  default:
+    break;
+  }
+  gen_addr(lv);
+  m->base = "%rax";
+}
+
+// Describes the object a pointer expression points to.
+static void pointer_mem(Node *p, Mem *m) {
+  *m = (Mem){};
+  if (p->kind == ND_ADDR) {
+    lvalue_mem(p->lhs, m);
+    return;
+  }
+  if (p->kind == ND_VAR && p->var->is_local && p->var->reg >= 0) {
+    m->base = callee_reg(p->var->reg, 8);
+    return;
+  }
+  if (p->kind == ND_ADD && p->ty->kind == TY_PTR) {
+    Node *base = p->lhs, *off = p->rhs;
+    if (off->kind == ND_NUM && fits_imm32(off->val)) {
+      pointer_mem(base, m);
+      m->disp += off->val;
+      return;
+    }
+
+    // base + index * scale
+    int scale = 1;
+    Node *idx = off;
+    if (off->kind == ND_SHL && off->rhs->kind == ND_NUM && off->rhs->val >= 0 && off->rhs->val <= 3) {
+      scale = 1 << off->rhs->val;
+      idx = off->lhs;
+    } else if (off->kind == ND_MUL && off->rhs->kind == ND_NUM &&
+               (off->rhs->val == 2 || off->rhs->val == 4 || off->rhs->val == 8)) {
+      scale = (int)off->rhs->val;
+      idx = off->lhs;
+    }
+    m->scale = scale;
+    if (base->kind == ND_ADDR && base->lhs->kind == ND_VAR && base->lhs->var->is_local &&
+        base->lhs->var->reg < 0) {
+      gen_expr(idx);
+      m->base = "%rbp";
+      m->index = "%rax";
+      m->disp = base->lhs->var->offset;
+      return;
+    }
+    if (base->kind == ND_VAR && base->var->is_local && base->var->reg >= 0) {
+      gen_expr(idx);
+      m->base = callee_reg(base->var->reg, 8);
+      m->index = "%rax";
+      return;
+    }
+    if (can_use_temp(base)) {
+      // Index first, kept in a temporary while the base address is formed.
+      gen_expr(idx);
+      int t = save_temp(false);
+      if (base->kind == ND_ADDR) {
+        lvalue_mem(base->lhs, m);
+      } else if (base->kind == ND_VAR && base->var->is_local && base->var->reg >= 0) {
+        *m = (Mem){.base = callee_reg(base->var->reg, 8)};
+      } else {
+        gen_expr(base);
+        *m = (Mem){.base = "%rax"};
+      }
+      release_temp(); // read by the instruction using this operand
+      if (m->index || m->sym) {
+        emit("lea %s, %%rax", mem_str(m));
+        *m = (Mem){.base = "%rax"};
+      }
+      m->index = int_temp(t, 8);
+      m->scale = scale;
+      return;
+    }
+    gen_pair(base, idx);
+    m->base = "%rax";
+    m->index = "%rdi";
+    return;
+  }
+  gen_expr(p);
+  m->base = "%rax";
+}
+
+static bool is_plain_rax(const Mem *m) { return !m->sym && !m->index && !m->disp && !strcmp(m->base, "%rax"); }
+
+static void lea_mem(const Mem *m) {
+  if (!is_plain_rax(m))
+    emit("lea %s, %%rax", mem_str(m));
+}
+
+static void load_mem(Type *ty, const Mem *m) {
+  switch (ty->kind) {
+  case TY_ARRAY: case TY_STRUCT: case TY_UNION: case TY_FUNC: case TY_VOID:
+    lea_mem(m);
+    return;
+  case TY_FLOAT:
+    emit("movss %s, %%xmm0", mem_str(m));
+    return;
+  case TY_DOUBLE: case TY_LDOUBLE:
+    emit("movsd %s, %%xmm0", mem_str(m));
+    return;
+  default:
+    load_int(ty, mem_str(m), "%eax", "%rax");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Assignment
 // ---------------------------------------------------------------------------
 
@@ -446,9 +671,35 @@ static void store_to_operand(Type *ty, const char *dst) {
     emit("mov %s, %s", reg_ax(ty->size), dst);
 }
 
+// Value first, then the address: "a[i] = x" needs no stack traffic.
+static bool gen_assign_via_temp(Node *node) {
+  Node *lhs = node->lhs;
+  if (!cg.optimize || !is_scalar(lhs->ty) || has_side_effects(lhs) || cg.temp_depth >= MAX_TEMPS)
+    return false;
+  bool fp = is_flonum(lhs->ty);
+  gen_expr(node->rhs);
+  int t = save_temp(fp);
+  Mem m;
+  lvalue_mem(lhs, &m);
+  if (fp) {
+    emit("%s %s, %s", lhs->ty->kind == TY_FLOAT ? "movss" : "movsd", fp_temps[t], mem_str(&m));
+    emit("movapd %s, %%xmm0", fp_temps[t]);
+  } else {
+    emit("mov %s, %s", int_temp(t, lhs->ty->size), mem_str(&m));
+    emit("mov %s, %%rax", int_temp(t, 8));
+  }
+  release_temp();
+  return true;
+}
+
 static void gen_assign(Node *node) {
   Node *lhs = node->lhs;
-  if (lhs->kind == ND_VAR && lhs->var->is_local && lhs->var->reg >= 0) {
+  if (lhs->kind == ND_VAR && is_xmm_var(lhs->var)) {
+    gen_expr(node->rhs);
+    emit("movapd %%xmm0, %s", xmm_var_reg(lhs->var));
+    return;
+  }
+  if (lhs->kind == ND_VAR && is_gp_reg_var(lhs->var)) {
     gen_expr(node->rhs);
     emit("mov %%rax, %s", callee_reg(lhs->var->reg, 8));
     return;
@@ -467,6 +718,8 @@ static void gen_assign(Node *node) {
       return;
     }
   }
+  if (gen_assign_via_temp(node))
+    return;
   gen_addr(lhs);
   push();
   gen_expr(node->rhs);
@@ -481,42 +734,135 @@ const char *label_name(int id) { return format(".L.cg.%d", id); }
 
 char *parser_label(int id) { return format(".L%d", id); }
 
-static void gen_float_binary(Node *node) {
-  gen_expr(node->rhs);
-  pushf();
-  gen_expr(node->lhs);
-  popf(1);
-
-  const char *sz = node->lhs->ty->kind == TY_FLOAT ? "ss" : "sd";
-  switch (node->kind) {
-  case ND_ADD: emit("add%s %%xmm1, %%xmm0", sz); return;
-  case ND_SUB: emit("sub%s %%xmm1, %%xmm0", sz); return;
-  case ND_MUL: emit("mul%s %%xmm1, %%xmm0", sz); return;
-  case ND_DIV: emit("div%s %%xmm1, %%xmm0", sz); return;
-  case ND_EQ:
-    emit("ucomi%s %%xmm1, %%xmm0", sz);
-    emit("sete %%al");
-    emit("setnp %%dl");
-    emit("and %%dl, %%al");
-    break;
-  case ND_NE:
-    emit("ucomi%s %%xmm1, %%xmm0", sz);
-    emit("setne %%al");
-    emit("setp %%dl");
-    emit("or %%dl, %%al");
-    break;
-  case ND_LT:
-    emit("ucomi%s %%xmm0, %%xmm1", sz);
-    emit("seta %%al");
-    break;
-  case ND_LE:
-    emit("ucomi%s %%xmm0, %%xmm1", sz);
-    emit("setae %%al");
-    break;
-  default:
-    ICE("invalid floating-point operator");
+// Evaluates a floating-point operand pair: lhs into %xmm0, rhs into %xmm1.
+// Evaluates lhs into %xmm0 and returns an operand holding rhs: %xmm1, a
+// register variable, a temporary or a memory operand.
+static const char *gen_float_operands(Node *node) {
+  Node *lhs = node->lhs, *rhs = node->rhs;
+  bool is_float = lhs->ty->kind == TY_FLOAT;
+  if (cg.optimize) {
+    if (rhs->kind == ND_VAR && is_xmm_var(rhs->var)) {
+      gen_expr(lhs);
+      return xmm_var_reg(rhs->var);
+    }
+    char *src = rhs->kind == ND_VAR ? var_operand(rhs->var) : nullptr;
+    if (src) {
+      gen_expr(lhs);
+      return src;
+    }
+    if (rhs->kind == ND_NUM) {
+      gen_expr(lhs);
+      if (is_float) {
+        float f = (float)rhs->fval;
+        uint32_t bits;
+        memcpy(&bits, &f, 4);
+        emit("mov $%u, %%eax", bits);
+        emit("movd %%eax, %%xmm1");
+      } else {
+        uint64_t bits;
+        memcpy(&bits, &rhs->fval, 8);
+        emit("movabs $%llu, %%rax", (unsigned long long)bits);
+        emit("movq %%rax, %%xmm1");
+      }
+      return "%xmm1";
+    }
+    if (can_use_temp(lhs)) {
+      gen_expr(rhs);
+      int t = save_temp(true);
+      gen_expr(lhs);
+      release_temp(); // read by the very next instruction
+      return fp_temps[t];
+    }
   }
-  emit("movzbl %%al, %%eax");
+  gen_expr(rhs);
+  pushf();
+  gen_expr(lhs);
+  popf(1);
+  return "%xmm1";
+}
+
+static bool is_float_compare(Node *node) {
+  return (node->kind == ND_EQ || node->kind == ND_NE || node->kind == ND_LT || node->kind == ND_LE) &&
+         is_flonum(node->lhs->ty);
+}
+
+// Emits ucomiss/ucomisd for a floating-point comparison. For < and <= the
+// operands are swapped so that "above" conditions reject NaN (unordered).
+static void gen_float_compare(Node *node) {
+  const char *sz = node->lhs->ty->kind == TY_FLOAT ? "ss" : "sd";
+  const char *r = gen_float_operands(node);
+  if (node->kind == ND_EQ || node->kind == ND_NE) {
+    emit("ucomi%s %s, %%xmm0", sz, r);
+    return;
+  }
+  if (r[0] != '%') { // the second operand of ucomis* must be a register
+    emit("mov%s %s, %%xmm1", sz, r);
+    r = "%xmm1";
+  }
+  emit("ucomi%s %%xmm0, %s", sz, r);
+}
+
+static void gen_float_binary(Node *node) {
+  const char *sz = node->lhs->ty->kind == TY_FLOAT ? "ss" : "sd";
+  if (is_float_compare(node)) {
+    gen_float_compare(node);
+    switch (node->kind) {
+    case ND_EQ:
+      emit("sete %%al");
+      emit("setnp %%dl");
+      emit("and %%dl, %%al");
+      break;
+    case ND_NE:
+      emit("setne %%al");
+      emit("setp %%dl");
+      emit("or %%dl, %%al");
+      break;
+    case ND_LT:
+      emit("seta %%al");
+      break;
+    default:
+      emit("setae %%al");
+      break;
+    }
+    emit("movzbl %%al, %%eax");
+    return;
+  }
+
+  const char *r = gen_float_operands(node);
+  switch (node->kind) {
+  case ND_ADD: emit("add%s %s, %%xmm0", sz, r); return;
+  case ND_SUB: emit("sub%s %s, %%xmm0", sz, r); return;
+  case ND_MUL: emit("mul%s %s, %%xmm0", sz, r); return;
+  case ND_DIV: emit("div%s %s, %%xmm0", sz, r); return;
+  default: ICE("invalid floating-point operator");
+  }
+}
+
+// Conditional jump on a floating-point comparison, NaN-correct.
+static void gen_float_branch(Node *cond, const char *label, bool jump_if) {
+  gen_float_compare(cond);
+  switch (cond->kind) {
+  case ND_LT:
+    emit("%s %s", jump_if ? "ja" : "jbe", label);
+    return;
+  case ND_LE:
+    emit("%s %s", jump_if ? "jae" : "jb", label);
+    return;
+  default: {
+    // Equal means ZF=1 and PF=0 (PF=1: unordered).
+    bool jump_on_equal = (cond->kind == ND_EQ) == jump_if;
+    if (jump_on_equal) {
+      const char *skip = label_name(new_cg_label());
+      emit("jp %s", skip);
+      emit("je %s", label);
+      emit_label("%s", skip);
+    } else {
+      emit("jne %s", label);
+      emit("jp %s", label);
+    }
+    return;
+  }
+  }
 }
 
 // Evaluates lhs into %rax and returns the operand holding rhs.
@@ -525,6 +871,23 @@ static const char *gen_operands(Node *node, int size) {
   if (src) {
     gen_expr(node->lhs);
     return src;
+  }
+  if (cg.optimize) {
+    // A simple left operand is loaded after the right one is computed.
+    const char *l = simple_operand(node->lhs, size);
+    if (l) {
+      gen_expr(node->rhs);
+      emit("mov %%rax, %%rdi");
+      emit("mov %s, %s", l, reg_ax(size));
+      return reg_di(size);
+    }
+    if (can_use_temp(node->lhs)) {
+      gen_expr(node->rhs);
+      int t = save_temp(false);
+      gen_expr(node->lhs);
+      release_temp(); // the register is read by the very next instruction
+      return int_temp(t, size);
+    }
   }
   gen_expr(node->rhs);
   push();
@@ -583,10 +946,18 @@ static void gen_shift(Node *node) {
     emit("%s $%lld, %s", op, (long long)(node->rhs->val & (size * 8 - 1)), ax);
     return;
   }
-  gen_expr(node->rhs);
-  push();
-  gen_expr(node->lhs);
-  pop("%rcx");
+  if (can_use_temp(node->lhs)) {
+    gen_expr(node->rhs);
+    int t = save_temp(false);
+    gen_expr(node->lhs);
+    emit("mov %s, %%rcx", int_temp(t, 8));
+    release_temp();
+  } else {
+    gen_expr(node->rhs);
+    push();
+    gen_expr(node->lhs);
+    pop("%rcx");
+  }
   emit("%s %%cl, %s", op, ax);
 }
 
@@ -678,6 +1049,10 @@ void gen_branch(Node *cond, const char *label, bool jump_if) {
         gen_compare(cond);
         bool u = cond->lhs->ty->is_unsigned || is_pointer_like(cond->lhs->ty);
         emit("j%s %s", jump_if ? condition_code(cond->kind, u) : negated_code(cond->kind, u), label);
+        return;
+      }
+      if (is_float_compare(cond)) {
+        gen_float_branch(cond, label, jump_if);
         return;
       }
       break;
@@ -783,7 +1158,11 @@ void gen_expr(Node *node) {
 
   case ND_VAR: {
     Obj *var = node->var;
-    if (var->is_local && var->reg >= 0) {
+    if (is_xmm_var(var)) {
+      emit("movapd %s, %%xmm0", xmm_var_reg(var));
+      return;
+    }
+    if (is_gp_reg_var(var)) {
       emit("mov %s, %%rax", callee_reg(var->reg, 8));
       return;
     }
@@ -805,13 +1184,25 @@ void gen_expr(Node *node) {
   }
 
   case ND_MEMBER:
-    gen_addr(node);
-    load(node->ty);
+    if (cg.optimize) {
+      Mem m;
+      lvalue_mem(node, &m);
+      load_mem(node->ty, &m);
+    } else {
+      gen_addr(node);
+      load(node->ty);
+    }
     if (node->member->is_bitfield)
       extract_bitfield(node->member);
     return;
 
   case ND_DEREF:
+    if (cg.optimize) {
+      Mem m;
+      pointer_mem(node->lhs, &m);
+      load_mem(node->ty, &m);
+      return;
+    }
     gen_expr(node->lhs);
     load(node->ty);
     return;
@@ -834,6 +1225,8 @@ void gen_expr(Node *node) {
     return;
 
   case ND_CAST:
+    if (cg.optimize && gen_cast_of_var(node))
+      return;
     gen_expr(node->lhs);
     cast(node->lhs->ty, node->ty);
     return;
@@ -939,13 +1332,18 @@ static bool gen_update_in_place(Node *node) {
   Node *rhs = strip_same_repr_casts(node->rhs);
   if ((rhs->kind != ND_ADD && rhs->kind != ND_SUB) || !same_var(rhs->lhs, lhs) || rhs->ty->size != ty->size)
     return false;
-  const char *src = simple_operand(rhs->rhs, ty->size);
-  if (!src)
-    return false;
-
   const char *op = rhs->kind == ND_ADD ? "add" : "sub";
   Obj *var = lhs->var;
-  if (var->is_local && var->reg >= 0) {
+  const char *src = simple_operand(rhs->rhs, ty->size);
+  if (!src) {
+    if (!is_gp_reg_var(var))
+      return false;
+    gen_expr(rhs->rhs); // "sum += a[i]" with sum in a register
+    emit("%s %s, %s", op, reg_ax(ty->size), callee_reg(var->reg, ty->size));
+    return true;
+  }
+
+  if (is_gp_reg_var(var)) {
     emit("%s %s, %s", op, src, callee_reg(var->reg, ty->size));
     return true;
   }
@@ -953,6 +1351,153 @@ static bool gen_update_in_place(Node *node) {
   if (!dst || src[0] != '$')
     return false; // memory-to-memory is not encodable
   emit("%s%s %s, %s", op, ty->size == 8 ? "q" : "l", src, dst);
+  return true;
+}
+
+// "r = 0", "r = s", "r = mem" for a register variable, as a statement.
+static bool gen_assign_simple_to_reg(Node *node) {
+  if (node->kind != ND_ASSIGN || node->lhs->kind != ND_VAR)
+    return false;
+  if (is_xmm_var(node->lhs->var) && node->rhs->kind == ND_VAR && is_xmm_var(node->rhs->var)) {
+    emit("movapd %s, %s", xmm_var_reg(node->rhs->var), xmm_var_reg(node->lhs->var));
+    return true;
+  }
+  if (!is_gp_reg_var(node->lhs->var))
+    return false;
+  Obj *var = node->lhs->var;
+  Node *rhs = node->rhs;
+  int size = var->ty->size;
+  if (rhs->kind == ND_NUM && is_int_or_ptr(rhs->ty)) {
+    if (rhs->val == 0)
+      emit("xor %s, %s", callee_reg(var->reg, 4), callee_reg(var->reg, 4));
+    else if (size <= 4)
+      emit("mov $%d, %s", (int32_t)rhs->val, callee_reg(var->reg, 4));
+    else if (fits_imm32(rhs->val))
+      emit("mov $%lld, %s", (long long)rhs->val, callee_reg(var->reg, 8));
+    else
+      emit("movabs $%lld, %s", (long long)rhs->val, callee_reg(var->reg, 8));
+    return true;
+  }
+  if (rhs->kind == ND_VAR && is_int_or_ptr(rhs->ty) && rhs->ty->size == size && !rhs->ty->is_volatile) {
+    if (is_gp_reg_var(rhs->var)) {
+      emit("mov %s, %s", callee_reg(rhs->var->reg, 8), callee_reg(var->reg, 8));
+      return true;
+    }
+    char *src = var_operand(rhs->var);
+    if (src) {
+      load_int(var->ty, src, callee_reg(var->reg, 4), callee_reg(var->reg, 8));
+      return true;
+    }
+  }
+  return false;
+}
+
+// Integer widening of a variable straight from where it lives:
+// "movslq %ebx, %rax" instead of "mov %rbx, %rax; movslq %eax, %rax".
+static bool gen_cast_of_var(Node *node) {
+  Node *v = node->lhs;
+  if (v->kind != ND_VAR || !is_integer(v->ty) || !is_int_or_ptr(node->ty) || node->ty->kind == TY_BOOL ||
+      v->ty->is_volatile || node->ty->size < v->ty->size)
+    return false;
+  const char *src = simple_operand(v, v->ty->size);
+  if (!src || src[0] == '$')
+    return false;
+  if (node->ty->size == 8 && v->ty->size == 4) {
+    if (v->ty->is_unsigned)
+      emit("mov %s, %%eax", src);
+    else
+      emit("movslq %s, %%rax", src);
+    return true;
+  }
+  if (v->ty->size < 4 && node->ty->size == 4) {
+    load_int(v->ty, src, "%eax", "%rax"); // sign/zero extends to 32 bits
+    return true;
+  }
+  return false;
+}
+
+// Structural equality of side-effect-free lvalues and address expressions.
+static bool same_tree(Node *a, Node *b) {
+  if (!a || !b)
+    return a == b;
+  if (a->kind != b->kind || a->ty->size != b->ty->size)
+    return false;
+  switch (a->kind) {
+  case ND_VAR:
+    return a->var == b->var;
+  case ND_NUM:
+    return a->val == b->val;
+  case ND_MEMBER:
+    return a->member == b->member && same_tree(a->lhs, b->lhs);
+  case ND_DEREF: case ND_ADDR: case ND_CAST:
+    return a->ty->is_unsigned == b->ty->is_unsigned && same_tree(a->lhs, b->lhs);
+  case ND_ADD: case ND_SUB: case ND_MUL: case ND_SHL:
+    return same_tree(a->lhs, b->lhs) && same_tree(a->rhs, b->rhs);
+  default:
+    return false;
+  }
+}
+
+// "L = L op e" on an integer or floating lvalue in memory: op straight into memory.
+static bool gen_read_modify_write(Node *node) {
+  if (node->kind != ND_ASSIGN)
+    return false;
+  Node *lhs = node->lhs;
+  Type *ty = lhs->ty;
+  if (has_side_effects(lhs) || (lhs->kind == ND_MEMBER && lhs->member->is_bitfield) ||
+      (lhs->kind == ND_VAR && is_gp_reg_var(lhs->var)) || cg.temp_depth >= MAX_TEMPS)
+    return false;
+  Node *rhs = strip_same_repr_casts(node->rhs);
+
+  if (is_flonum(ty)) {
+    if (rhs->ty->kind != ty->kind)
+      return false;
+    static const char *ops[] = {[ND_ADD] = "add", [ND_SUB] = "sub", [ND_MUL] = "mul", [ND_DIV] = "div"};
+    if (rhs->kind > ND_DIV || !ops[rhs->kind] || !same_tree(rhs->lhs, lhs))
+      return false;
+    const char *sz = ty->kind == TY_FLOAT ? "ss" : "sd";
+    if (lhs->kind == ND_VAR && is_xmm_var(lhs->var)) {
+      gen_expr(rhs->rhs);
+      emit("%s%s %%xmm0, %s", ops[rhs->kind], sz, xmm_var_reg(lhs->var));
+      return true;
+    }
+    gen_expr(rhs->rhs);
+    int t = save_temp(true);
+    Mem m;
+    lvalue_mem(lhs, &m);
+    char *mem = mem_str(&m);
+    emit("mov%s %s, %%xmm0", sz, mem);
+    emit("%s%s %s, %%xmm0", ops[rhs->kind], sz, fp_temps[t]);
+    emit("mov%s %%xmm0, %s", sz, mem);
+    release_temp();
+    return true;
+  }
+
+  if (!is_int_or_ptr(ty) || ty->size < 4 || rhs->ty->size != ty->size || !same_tree(rhs->lhs, lhs))
+    return false;
+  const char *op;
+  switch (rhs->kind) {
+  case ND_ADD: op = "add"; break;
+  case ND_SUB: op = "sub"; break;
+  case ND_BITAND: op = "and"; break;
+  case ND_BITOR: op = "or"; break;
+  case ND_BITXOR: op = "xor"; break;
+  default: return false;
+  }
+  const char *suffix = ty->size == 8 ? "q" : "l";
+  const char *src = simple_operand(rhs->rhs, ty->size);
+  if (src && src[0] == '$') {
+    Mem m;
+    lvalue_mem(lhs, &m);
+    emit("%s%s %s, %s", op, suffix, src, mem_str(&m));
+    return true;
+  }
+  gen_expr(rhs->rhs);
+  int t = save_temp(false);
+  Mem m;
+  lvalue_mem(lhs, &m);
+  emit("%s %s, %s", op, int_temp(t, ty->size), mem_str(&m));
+  release_temp();
   return true;
 }
 
@@ -976,7 +1521,7 @@ void gen_discard(Node *node) {
       gen_discard(node->rhs);
       return;
     }
-    if (gen_update_in_place(node))
+    if (gen_update_in_place(node) || gen_read_modify_write(node) || gen_assign_simple_to_reg(node))
       return;
   }
   gen_expr(node);

@@ -133,6 +133,10 @@ static void load_simple_arg(Node *arg, int gp, int fp) {
       return;
     }
     Obj *var = arg->var;
+    if (is_xmm_var(var)) {
+      emit("movapd %s, %%xmm%d", xmm_var_reg(var), fp);
+      return;
+    }
     char *src = var->is_local ? format("%d(%%rbp)", var->offset) : symbol_ref(var);
     emit("%s %s, %%xmm%d", ty->kind == TY_FLOAT ? "movss" : "movsd", src, fp);
     return;
@@ -357,12 +361,14 @@ void gen_funcall(Node *node) {
       emit("mov $%d, %%eax", total_fp);
   }
 
+  spill_xmm_vars(false);
   if (!callee)
     emit("call *%%r10");
   else if (is_local_symbol(callee))
     emit("call %s", callee->name);
   else
     emit("call %s@PLT", callee->name);
+  spill_xmm_vars(true);
 
   int cleanup = (stack_slots + pad) * 8;
   if (cleanup)
@@ -441,11 +447,16 @@ void gen_params(Obj *fn) {
 
     if (is_flonum(ty)) {
       if (fp >= MAX_FP) {
-        p->offset = stack_off;
+        p->offset = stack_off; // the caller's argument slot doubles as the home slot
+        if (is_xmm_var(p))
+          emit("%s %d(%%rbp), %s", ty->kind == TY_FLOAT ? "movss" : "movsd", p->offset, xmm_var_reg(p));
         stack_off += 8;
         continue;
       }
-      emit("%s %%xmm%d, %d(%%rbp)", ty->kind == TY_FLOAT ? "movss" : "movsd", fp++, p->offset);
+      if (is_xmm_var(p))
+        emit("movapd %%xmm%d, %s", fp++, xmm_var_reg(p));
+      else
+        emit("%s %%xmm%d, %d(%%rbp)", ty->kind == TY_FLOAT ? "movss" : "movsd", fp++, p->offset);
       continue;
     }
 
