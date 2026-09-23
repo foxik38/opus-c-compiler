@@ -101,8 +101,21 @@ static void mark_addr_taken(Node *node) {
   }
 }
 
-// Lvalue-to-rvalue conversion: arrays and functions decay to pointers.
+// An unsigned int bit-field narrower than int: its values all fit in int, so
+// the integer promotions make it int (C23 6.3.1.1), not unsigned int.
+static bool is_int_promoted_bitfield(const Node *node) {
+  return node->kind == ND_MEMBER && node->member->is_bitfield && is_integer(node->ty) &&
+         node->ty->is_unsigned && node->ty->size == 4 && node->member->bit_width < 32;
+}
+
+// Lvalue-to-rvalue conversion: arrays and functions decay to pointers, and
+// narrow unsigned bit-fields are promoted to int.
 Node *rvalue(Node *node) {
+  if (is_int_promoted_bitfield(node)) {
+    Node *n = new_cast(node, ty_int);
+    n->is_implicit = true;
+    return n;
+  }
   if (node->ty->kind == TY_ARRAY) {
     mark_addr_taken(node);
     Node *n = new_unary(ND_ADDR, node, node->tok);
@@ -447,6 +460,8 @@ static bool is_known_nonnegative(Node *n) {
     return true;
   switch (n->kind) {
   case ND_CAST: // widening keeps the value
+    if (is_int_promoted_bitfield(n->lhs))
+      return true;
     return is_integer(n->lhs->ty) && n->lhs->ty->size < n->ty->size && is_known_nonnegative(n->lhs);
   case ND_EQ: case ND_NE: case ND_LT: case ND_LE: case ND_NOT: case ND_LOGAND: case ND_LOGOR:
     return true;

@@ -221,5 +221,18 @@ int main(void) {
   // Nested member access through struct returned by function.
   ASSERT(8, make_point(7, 8).y);
 
+  // An unsigned bit-field narrower than int promotes to int, so arithmetic
+  // on it stays signed (found by Csmith).
+  struct {
+    unsigned small : 14;
+    unsigned full : 32;
+  } pf = {3, 3};
+  short negative = -16890;
+  ASSERT(1, (pf.small | 0x10) > negative);
+  ASSERT(0, (pf.full | 0x10) > negative);    // unsigned int: -16890 converts to a huge value
+  ASSERT(1, _Generic(pf.small + 0, int: 1, default: 0));
+  ASSERT(1, _Generic(pf.full + 0, unsigned: 1, default: 0));
+  ASSERT(-4, -pf.small - 1);
+
   return test_done();
 }

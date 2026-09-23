@@ -181,7 +181,7 @@ compiler, so a second round went looking for bugs somewhere else: other
 people's code. Lua, SQLite (307k lines including its shell), Duktape, MuJS,
 Jim Tcl, zlib, bzip2, LZ4 and xxHash were built with occ at both levels and
 checked with their own test suites, or byte-for-byte against GCC builds;
-400 Csmith programs and an AddressSanitizer build of occ itself ran
+500 Csmith programs and an AddressSanitizer build of occ itself ran
 alongside. It paid off in exactly the places hand-written tests are weak:
 
 - **Mixed-sign overflow builtins.** `ckd_add(&unsigned_long, -1, 0)` said
@@ -195,6 +195,10 @@ alongside. It paid off in exactly the places hand-written tests are weak:
 - **`__has_c_attribute` produced by a macro** inside `#if` (xxHash) was
   rejected; such operators are now evaluated after expansion.
 - **`-rdynamic`** was missing, which Jim Tcl's plugin tests need.
+- **Bit-field promotion** (Csmith): an `unsigned int x : 14` promotes to
+  `int`, not `unsigned int`, because `int` holds all its values. occ used
+  the declared type, which turned a comparison with a negative `short`
+  upside down. One of 500 Csmith programs caught it.
 
 The live display followed the same rule as the rest: it must never cost
 correctness or machine-readability. The spinner runs on a helper thread only

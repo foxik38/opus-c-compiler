@@ -233,10 +233,11 @@ examples/      small programs to try          tests/   runtime, diagnostic, benc
 | [bzip2](https://sourceware.org/bzip2/) 1.0.8 | ‏8 אלף שורות | הדוגמאות של `make test` עוברות; הפלט זהה בית אחר בית לזה של GCC |
 | [LZ4](https://lz4.org) 1.10 | ‏18 אלף שורות | רמות 1/9/12 זהות לפלט של GCC, דחיסה ופריסה תקינות |
 | [xxHash](https://xxhash.com) 0.8.3 | ‏12 אלף שורות | בדיקת השפיות: כל 49948 הווקטורים עוברים; כל ארבע פונקציות הגיבוב תואמות |
-| [Csmith](https://github.com/csmith-project/csmith) | אקראי | ‏400 תוכניות שנוצרו, אף אחת לא שונה מ-GCC |
+| [Csmith](https://github.com/csmith-project/csmith) | אקראי | ‏500 תוכניות שנוצרו; ההבדל היחיד מ-GCC היה באג, שכבר תוקן |
 
 כל אחת מההרצות האלה מצאה או אישרה משהו: הבנייה של Lua חשפה שתי אזהרות שווא, xxHash — באג
-בקדם-מעבד, ו-Jim Tcl — אפשרות `-rdynamic` חסרה. הכול תוקן ומוגן בבדיקות רגרסיה.
+בקדם-מעבד, Jim Tcl — אפשרות `-rdynamic` חסרה, ו-Csmith — קידום שגוי של שדות סיביות. הכול תוקן
+ומוגן בבדיקות רגרסיה.
 
 ## תמיכה ב-C23
 

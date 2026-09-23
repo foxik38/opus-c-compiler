@@ -212,11 +212,11 @@ Az alábbi projekteket az occ mindkét optimalizálási szinten lefordította, �
 | [bzip2](https://sourceware.org/bzip2/) 1.0.8 | 8 ezer sor | a `make test` mintái átmennek; a kimenet bájtra egyezik a GCC-sével |
 | [LZ4](https://lz4.org) 1.10 | 18 ezer sor | az 1/9/12-es szint kimenete egyezik a GCC-sével, oda-vissza tömörítés rendben |
 | [xxHash](https://xxhash.com) 0.8.3 | 12 ezer sor | sanity teszt: mind a 49948 vektor sikeres; mind a négy hash egyezik |
-| [Csmith](https://github.com/csmith-project/csmith) | véletlen | 400 generált program, egyetlen eltérés sincs a GCC-hez képest |
+| [Csmith](https://github.com/csmith-project/csmith) | véletlen | 500 generált program; az egyetlen eltérés a GCC-hez képest hiba volt, már javítva |
 
 Mindegyik futás talált vagy megerősített valamit: a Lua fordítása két téves figyelmeztetést
-leplezett le, az xxHash egy előfeldolgozó-hibát, a Jim Tcl pedig egy hiányzó `-rdynamic` kapcsolót —
-mindet javítottuk, és regressziós tesztek védik őket.
+leplezett le, az xxHash egy előfeldolgozó-hibát, a Jim Tcl egy hiányzó `-rdynamic` kapcsolót, a Csmith
+pedig a bitmezők hibás egész-előléptetését — mindet javítottuk, és regressziós tesztek védik őket.
 
 ## C23-támogatás
 
