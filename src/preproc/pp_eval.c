@@ -265,9 +265,11 @@ bool pp_eval_condition(Token *line, const Token *directive) {
   if (line->kind == TK_EOF)
     error_tok(directive, "#%.*s with no expression", directive->len, directive->loc);
   Token *tok = replace_operators(line);
-  tok = pp_expand(tok);
-  // "defined" produced by macro expansion is undefined behavior in ISO C, but
-  // it is common in real headers; evaluate it like GCC does.
+  tok = pp_expand_condition(tok);
+  // Operators produced by macro expansion, e.g. from
+  //   #define HAS_ATTR(x) __has_c_attribute(x)
+  // ("defined" produced this way is undefined behavior in ISO C, but common
+  // in real headers; it is evaluated like GCC does).
   tok = replace_operators(tok);
 
   PPParser p = {.tok = tok, .directive = directive, .evaluate = true};

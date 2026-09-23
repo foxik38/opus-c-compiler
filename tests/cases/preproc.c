@@ -46,6 +46,17 @@ static int helper_seen = HELPER_VALUE;
 static int arith_ok = 1;
 #endif
 
+// Operators produced by macro expansion inside #if (xxHash does this).
+#define HAS_C_ATTR(x) __has_c_attribute(x)
+#define HAS_INC(x) __has_include(x)
+#define IS_DEF(x) defined(x)
+#if HAS_C_ATTR(fallthrough) && HAS_C_ATTR(nodiscard) >= 202003L && !HAS_C_ATTR(no_such_attr) && \
+    HAS_INC(<stdio.h>) && !HAS_INC(<no_such_header.h>) && IS_DEF(HAS_INC) && !IS_DEF(NOT_DEFINED)
+static const int expanded_operators = 1;
+#else
+static const int expanded_operators = 0;
+#endif
+
 #if __has_include(<stdio.h>) && !__has_include("does_not_exist.h")
 static int has_include_ok = 1;
 #endif
@@ -98,6 +109,7 @@ int main(void) {
   ASSERT(1, undef_ok);
   ASSERT(1000, line_after);
   ASSERT(8, HELPER_TWICE(4));
+  ASSERT(1, expanded_operators);
   ASSERT(1, strstr(__FILE__, "preproc.c") != nullptr);
   ASSERT(1, __STDC__);
   ASSERT(1, __STDC_HOSTED__);

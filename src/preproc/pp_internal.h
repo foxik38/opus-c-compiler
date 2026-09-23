@@ -19,6 +19,7 @@ bool macro_is_defined(const Token *name);
 bool macro_try_expand(Token **rest, Token *tok);
 // Fully macro-expands an EOF-terminated list (no directives).
 Token *pp_expand(Token *tok);
+Token *pp_expand_condition(Token *tok); // leaves defined, __has_include etc. in place
 void macro_set_file_hooks(char *(*base_file)(void));
 
 // Directives (preprocess.c).

@@ -583,11 +583,17 @@ static Token *subst(Token *tok, MacroArg *args, Token *origin, bool funclike) {
   return head.next;
 }
 
+static Token *if_only_operator(Token *tok);
+static bool in_condition; // expanding the line of a #if or #elif
+
 bool macro_try_expand(Token **rest, Token *tok) {
   if (hideset_contains(tok->hideset, tok->loc, tok->len))
     return false;
   Macro *m = find_macro(tok);
   if (!m)
+    return false;
+  // defined, __has_include etc. produced by expansion are evaluated after it.
+  if (m->handler == if_only_operator && in_condition)
     return false;
 
   if (m->handler) {
@@ -644,6 +650,13 @@ Token *pp_expand(Token *tok) {
   }
   cur->next = tok;
   return head.next;
+}
+
+Token *pp_expand_condition(Token *tok) {
+  in_condition = true;
+  tok = pp_expand(tok);
+  in_condition = false;
+  return tok;
 }
 
 // ---------------------------------------------------------------------------
@@ -793,6 +806,7 @@ static void define_from_source(const char *src, const char *name) {
 void macro_reset(const PreprocOptions *opts) {
   macros = (HashMap){};
   counter_value = 0;
+  in_condition = false; // an error may have unwound out of a #if
 
   define_from_source(predefined_source, "<built-in>");
   // Predefined macros count as builtins for redefinition warnings.
