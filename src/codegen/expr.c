@@ -591,38 +591,46 @@ static void pointer_mem(Node *p, Mem *m) {
       idx = off->lhs;
     }
     m->scale = scale;
+    // An index held in a register variable is used as is.
+    const char *reg_index = idx->kind == ND_VAR && is_gp_reg_var(idx->var) && idx->ty->size == 8
+                                ? callee_reg(idx->var->reg, 8)
+                                : nullptr;
     if (base->kind == ND_ADDR && base->lhs->kind == ND_VAR && base->lhs->var->is_local &&
         base->lhs->var->reg < 0) {
-      gen_expr(idx);
+      if (!reg_index)
+        gen_expr(idx);
       m->base = "%rbp";
-      m->index = "%rax";
+      m->index = reg_index ? reg_index : "%rax";
       m->disp = base->lhs->var->offset;
       return;
     }
-    if (base->kind == ND_VAR && base->var->is_local && base->var->reg >= 0) {
-      gen_expr(idx);
+    if (base->kind == ND_VAR && is_gp_reg_var(base->var)) {
+      if (!reg_index)
+        gen_expr(idx);
       m->base = callee_reg(base->var->reg, 8);
-      m->index = "%rax";
+      m->index = reg_index ? reg_index : "%rax";
       return;
     }
-    if (can_use_temp(base)) {
+    if (reg_index || can_use_temp(base)) {
       // Index first, kept in a temporary while the base address is formed.
-      gen_expr(idx);
-      int t = save_temp(false);
+      int t = -1;
+      if (!reg_index) {
+        gen_expr(idx);
+        t = save_temp(false);
+      }
       if (base->kind == ND_ADDR) {
         lvalue_mem(base->lhs, m);
-      } else if (base->kind == ND_VAR && base->var->is_local && base->var->reg >= 0) {
-        *m = (Mem){.base = callee_reg(base->var->reg, 8)};
       } else {
         gen_expr(base);
         *m = (Mem){.base = "%rax"};
       }
-      release_temp(); // read by the instruction using this operand
+      if (t >= 0)
+        release_temp(); // read by the instruction using this operand
       if (m->index || m->sym) {
         emit("lea %s, %%rax", mem_str(m));
         *m = (Mem){.base = "%rax"};
       }
-      m->index = int_temp(t, 8);
+      m->index = reg_index ? reg_index : int_temp(t, 8);
       m->scale = scale;
       return;
     }
@@ -671,28 +679,49 @@ static void store_to_operand(Type *ty, const char *dst) {
     emit("mov %s, %s", reg_ax(ty->size), dst);
 }
 
+static const char *size_suffix(int size) {
+  return size == 1 ? "b" : size == 2 ? "w" : size == 4 ? "l" : "q";
+}
+
 // Value first, then the address: "a[i] = x" needs no stack traffic.
-static bool gen_assign_via_temp(Node *node) {
+// `need_value` is false in statement context, where %rax is dead afterwards.
+static bool gen_assign_via_temp(Node *node, bool need_value) {
   Node *lhs = node->lhs;
   if (!cg.optimize || !is_scalar(lhs->ty) || has_side_effects(lhs) || cg.temp_depth >= MAX_TEMPS)
     return false;
+
+  // Constant stores need no register at all: movl $1, (%rbx,%rax,4).
+  Node *rhs = node->rhs;
+  if (!need_value && rhs->kind == ND_NUM && is_int_or_ptr(rhs->ty) &&
+      (fits_imm32(rhs->val) || (lhs->ty->size <= 4 && rhs->val <= UINT32_MAX))) {
+    Mem m;
+    lvalue_mem(lhs, &m);
+    int size = lhs->ty->size;
+    int64_t v = size == 1 ? (int8_t)rhs->val : size == 2 ? (int16_t)rhs->val : size == 4 ? (int32_t)rhs->val
+                                                                                          : rhs->val;
+    emit("mov%s $%lld, %s", size_suffix(size), (long long)v, mem_str(&m));
+    return true;
+  }
+
   bool fp = is_flonum(lhs->ty);
-  gen_expr(node->rhs);
+  gen_expr(rhs);
   int t = save_temp(fp);
   Mem m;
   lvalue_mem(lhs, &m);
   if (fp) {
     emit("%s %s, %s", lhs->ty->kind == TY_FLOAT ? "movss" : "movsd", fp_temps[t], mem_str(&m));
-    emit("movapd %s, %%xmm0", fp_temps[t]);
+    if (need_value)
+      emit("movapd %s, %%xmm0", fp_temps[t]);
   } else {
     emit("mov %s, %s", int_temp(t, lhs->ty->size), mem_str(&m));
-    emit("mov %s, %%rax", int_temp(t, 8));
+    if (need_value)
+      emit("mov %s, %%rax", int_temp(t, 8));
   }
   release_temp();
   return true;
 }
 
-static void gen_assign(Node *node) {
+static void gen_assign(Node *node, bool need_value) {
   Node *lhs = node->lhs;
   if (lhs->kind == ND_VAR && is_xmm_var(lhs->var)) {
     gen_expr(node->rhs);
@@ -718,7 +747,7 @@ static void gen_assign(Node *node) {
       return;
     }
   }
-  if (gen_assign_via_temp(node))
+  if (gen_assign_via_temp(node, need_value))
     return;
   gen_addr(lhs);
   push();
@@ -1212,7 +1241,7 @@ void gen_expr(Node *node) {
     return;
 
   case ND_ASSIGN:
-    gen_assign(node);
+    gen_assign(node, true);
     return;
 
   case ND_COMMA:
@@ -1523,6 +1552,10 @@ void gen_discard(Node *node) {
     }
     if (gen_update_in_place(node) || gen_read_modify_write(node) || gen_assign_simple_to_reg(node))
       return;
+    if (node->kind == ND_ASSIGN) {
+      gen_assign(node, false);
+      return;
+    }
   }
   gen_expr(node);
 }

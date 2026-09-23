@@ -191,6 +191,21 @@ static Node *simplify_logical(Node *n) {
   return n;
 }
 
+// A conversion the code generator implements as a no-op: between integer
+// types of the same width and signedness, between pointers, or between
+// identical floating types. Such casts only get in the way of codegen
+// pattern matching, so they are removed.
+static bool is_noop_cast(const Node *n) {
+  const Type *from = n->lhs->ty, *to = n->ty;
+  if (to->kind == TY_BOOL || from->kind == TY_BOOL)
+    return to->kind == from->kind;
+  if (is_integer(from) && is_integer(to))
+    return from->size == to->size && from->is_unsigned == to->is_unsigned;
+  if (from->kind == TY_PTR && to->kind == TY_PTR)
+    return true;
+  return is_flonum(from) && from->kind == to->kind;
+}
+
 static void opt_args(Node *n) {
   Node head = {.next = n->args};
   for (Node *p = &head; p->next; p = p->next) {
@@ -228,6 +243,12 @@ static Node *opt_expr(Node *n) {
     opt_args(n);
 
   switch (n->kind) {
+  case ND_CAST:
+    if (is_noop_cast(n)) {
+      stats->simplified++;
+      return n->lhs;
+    }
+    return try_fold(n);
   case ND_COND:
     if (n->cond->kind == ND_NUM && is_integer(n->cond->ty)) {
       stats->branches++;
@@ -347,4 +368,5 @@ void optimize_program(Program *prog, OptStats *out) {
   for (Obj *fn = prog->globals; fn; fn = fn->next)
     if (fn->is_function && fn->body)
       fn->body = opt_stmt(fn->body);
+  hoist_loop_invariants(prog, out);
 }

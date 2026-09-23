@@ -116,6 +116,30 @@ static void rewrite(Peephole *p, int i) {
     }
   }
 
+  // jCC L1; jmp L2; L1:  =>  jNCC L2; L1:
+  if (l[1] == 'j' && !starts_with(l, "\tjmp") && n && starts_with(n, "\tjmp ") && n[5] != '*') {
+    int k = next_live(v, j);
+    const char *target = strchr(l, ' ');
+    const char *cc_inv = nullptr;
+    static const char *pairs[][2] = {{"e", "ne"}, {"l", "ge"}, {"le", "g"}, {"b", "ae"}, {"be", "a"},
+                                     {"s", "ns"}, {"p", "np"}, {"o", "no"}};
+    char cc[8];
+    snprintf(cc, sizeof cc, "%.*s", (int)(target - l - 2), l + 2);
+    for (size_t pi = 0; pi < ARRAY_LEN(pairs) && !cc_inv; pi++) {
+      if (strcmp(cc, pairs[pi][0]) == 0)
+        cc_inv = pairs[pi][1];
+      else if (strcmp(cc, pairs[pi][1]) == 0)
+        cc_inv = pairs[pi][0];
+    }
+    const char *next_label = k >= 0 ? v->data[k] : nullptr;
+    if (cc_inv && is_label(next_label) && strlen(next_label) - 1 == strlen(target + 1) &&
+        strncmp(next_label, target + 1, strlen(target + 1)) == 0) {
+      replace(p, i, format("\tj%s %s", cc_inv, n + 5));
+      kill(p, j);
+      return;
+    }
+  }
+
   // Code after an unconditional transfer is unreachable up to the next label.
   if (eq(l, "\tret") || eq(l, "\tud2") || starts_with(l, "\tjmp ")) {
     for (int k = j; k >= 0 && is_insn(v->data[k]); k = next_live(v, k))

@@ -252,8 +252,9 @@ static bool compile_c_file(Build *b, const char *path, int index) {
     report_substage("parse+check", false, tp, "typed AST");
     if (optimize)
       report_substage("optimize", false, to,
-                      format("%d folded, %d simplified, %d dead branches", opt_job.stats.folded,
-                             opt_job.stats.simplified, opt_job.stats.branches));
+                      format("%d folded, %d simplified, %d dead branches, %d hoisted from loops",
+                             opt_job.stats.folded, opt_job.stats.simplified, opt_job.stats.branches,
+                             opt_job.stats.hoisted));
     char *gen_detail = optimize ? format("%d vars in registers, %d peephole removals, %d jump tables",
                                          gen_job.stats.promoted_vars, gen_job.stats.peephole_removed,
                                          gen_job.stats.jump_tables)
