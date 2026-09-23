@@ -170,7 +170,9 @@ static bool assemble(Build *b, const char *src, const char *input, int index) {
   ProcResult r;
   bool ok = run_process(cmd.data, &r);
   add_time(&b->total, r.time);
-  char *detail = ok ? format("%s (%s)", file_part(obj), format_size(file_size(obj))) : nullptr;
+  // Temporary objects carry an index prefix; show the name the user expects.
+  const char *shown = starts_with(obj, b->tmpdir) ? format("%s.o", strip_extension(input)) : file_part(obj);
+  char *detail = ok ? format("%s (%s)", shown, format_size(file_size(obj))) : nullptr;
   report_stage("assemble", ok ? STATUS_OK : STATUS_ERR, r.time, detail);
   if (!ok) {
     print_tool_output(r.output);
