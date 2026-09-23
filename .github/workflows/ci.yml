@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: build, test, self-host, fuzz
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build occ
+        run: make -j"$(nproc)"
+
+      - name: Validate the tests with GCC
+        run: tests/run.sh --reference gcc
+
+      - name: Test suite (-o none and -o prod)
+        run: make test
+
+      - name: Self-host (bootstrap fixpoint)
+        run: make selfhost
+
+      - name: Differential fuzzing against GCC
+        run: make fuzz FUZZ_COUNT=200
+
+      - name: Differential testing with Csmith programs
+        run: |
+          sudo apt-get install -y --no-install-recommends csmith libcsmith-dev
+          python3 tests/fuzz/csmith.py --count 40
+
+      - name: Build and run the examples
+        run: |
+          for e in hello c23_tour life mandelbrot; do
+            (cd examples && ../occ -q -o prod "$e.c" --run > /dev/null)
+          done
+          ./occ -q -o prod examples/wordfreq.c -n wordfreq && ./wordfreq < README.md
+
+      - name: Upload failing fuzz cases
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failures
+          path: tests/out/*-fail-*.c
+          if-no-files-found: ignore
