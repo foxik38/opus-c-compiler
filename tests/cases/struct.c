@@ -4,6 +4,15 @@
 
 #include "test.h"
 
+#pragma pack(push, 1)
+struct Packed1 { int first; long wide; char last; };
+#pragma pack(pop)
+_Pragma("pack(push, 4)")
+struct Packed4 { char c; double d; };
+_Pragma("pack(pop)")
+struct Natural { char c; double d; };
+struct __attribute__((packed)) AttrPacked { char c; int i; };
+
 struct Point {
   int x, y;
 };
@@ -233,6 +242,21 @@ int main(void) {
   ASSERT(1, _Generic(pf.small + 0, int: 1, default: 0));
   ASSERT(1, _Generic(pf.full + 0, unsigned: 1, default: 0));
   ASSERT(-4, -pf.small - 1);
+
+  // #pragma pack and __attribute__((packed)) change the layout, even after
+  // glibc's <sys/cdefs.h> has tried to define __attribute__ away (found by
+  // Csmith).
+  ASSERT(13, sizeof(struct Packed1));
+  ASSERT(4, offsetof(struct Packed1, wide));
+  ASSERT(1, alignof(struct Packed1));
+  ASSERT(12, sizeof(struct Packed4));
+  ASSERT(4, offsetof(struct Packed4, d));
+  ASSERT(16, sizeof(struct Natural));
+  ASSERT(5, sizeof(struct AttrPacked));
+  struct Packed1 packed = {1, 2, 3};
+  packed.wide += 40;
+  ASSERT(42, packed.wide);
+  ASSERT(3, packed.last);
 
   return test_done();
 }

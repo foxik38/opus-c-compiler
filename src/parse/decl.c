@@ -691,10 +691,32 @@ static int member_size(const Member *m) {
   return m->ty->kind == TY_ARRAY && m->ty->array_len < 0 ? 0 : m->ty->size;
 }
 
+// A member's alignment inside a struct, after #pragma pack.
+static int member_align(const Type *ty, const Member *m) {
+  return ty->max_align ? MIN(m->align, ty->max_align) : m->align;
+}
+
 static void layout_struct(Type *ty) {
   int64_t bits = 0;
   int align = 1;
   for (Member *m = ty->members; m; m = m->next) {
+    if (m->is_bitfield && ty->max_align && ty->max_align < m->align) {
+      // Under #pragma pack a bit-field may straddle its storage unit, and
+      // the unit is only aligned to the pack value.
+      if (m->bit_width == 0)
+        continue;
+      m->offset = (int)(bits / 8 / ty->max_align * ty->max_align);
+      m->bit_offset = (int)(bits - (int64_t)m->offset * 8);
+      if (m->bit_offset + m->bit_width > m->ty->size * 8) { // must fit one load
+        bits = align_to(bits, 8);
+        m->offset = (int)(bits / 8);
+        m->bit_offset = 0;
+      }
+      bits += m->bit_width;
+      if (m->name)
+        align = MAX(align, member_align(ty, m));
+      continue;
+    }
     if (m->is_bitfield) {
       int unit = m->ty->size * 8;
       if (m->bit_width == 0) {
@@ -712,11 +734,11 @@ static void layout_struct(Type *ty) {
       continue;
     }
     if (!ty->is_packed)
-      bits = align_to(bits, (int64_t)m->align * 8);
+      bits = align_to(bits, (int64_t)member_align(ty, m) * 8);
     m->offset = (int)(bits / 8);
     bits += (int64_t)member_size(m) * 8;
     if (!ty->is_packed)
-      align = MAX(align, m->align);
+      align = MAX(align, member_align(ty, m));
   }
   ty->align = align;
   ty->size = (int)(align_to(bits, (int64_t)align * 8) / 8);
@@ -728,7 +750,7 @@ static void layout_union(Type *ty) {
     m->offset = 0;
     size = MAX(size, member_size(m));
     if (!ty->is_packed && (m->name || !m->is_bitfield))
-      align = MAX(align, m->align);
+      align = MAX(align, member_align(ty, m));
   }
   ty->align = align;
   ty->size = (int)align_to(size, align);
@@ -764,6 +786,7 @@ static Type *struct_union_decl(Token **rest, Token *tok, TypeKind kind) {
   }
   if (!tag && !tok_equal(tok, "{"))
     error_tok(tok, "expected '{' or a tag name after '%s'", what);
+  int pack = tok->pack; // #pragma pack in effect at the definition
   tok = tok->next;
 
   Type *ty = nullptr;
@@ -788,6 +811,7 @@ static Type *struct_union_decl(Token **rest, Token *tok, TypeKind kind) {
   ty->members = struct_members(&tok, tok, ty);
   tok = parse_attributes(tok, &attrs);
   ty->is_packed = attrs.packed;
+  ty->max_align = pack;
   if (kind == TY_STRUCT)
     layout_struct(ty);
   else

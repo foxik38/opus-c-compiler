@@ -34,6 +34,9 @@ static struct {
   HashMap include_guards; // path -> guard macro name
   HashMap file_cache;     // path -> SourceFile* (avoids re-reading headers)
   char *base_file;
+  int pack;           // current #pragma pack value (0 = natural alignment)
+  int pack_stack[32]; // #pragma pack(push)
+  int pack_depth;
 } pp;
 
 enum { MAX_INCLUDE_DEPTH = 200 };
@@ -431,7 +434,56 @@ static Token *line_directive(Token *tok) {
   return tok;
 }
 
+// #pragma pack(N), pack(), pack(push[, N]), pack(pop): the maximum
+// alignment of struct members declared after it (GCC and MSVC semantics).
+static Token *pragma_pack(Token *tok) {
+  Token *start = tok;
+  tok = tok_skip(tok->next, "(");
+  int value = -1; // -1: unchanged
+  bool push = false, pop = false;
+  for (bool first = true; !tok_equal(tok, ")"); first = false) {
+    if (!first)
+      tok = tok_skip(tok, ",");
+    if (tok_equal(tok, "push") || tok_equal(tok, "pop")) {
+      push = tok_equal(tok, "push");
+      pop = !push;
+      tok = tok->next;
+    } else if (tok->kind == TK_PP_NUM && convert_pp_int(tok)) {
+      value = (int)tok->ival;
+      if (value < 1 || value > 16 || (value & (value - 1)))
+        error_tok(tok, "alignment in '#pragma pack' must be 1, 2, 4, 8 or 16");
+      tok = tok->next;
+    } else if (tok->kind == TK_IDENT) {
+      tok = tok->next; // MSVC's named push/pop label
+    } else {
+      error_tok(tok, "malformed '#pragma pack'");
+    }
+  }
+  tok = tok->next;
+  if (push) {
+    if (pp.pack_depth == (int)ARRAY_LEN(pp.pack_stack))
+      error_tok(start, "'#pragma pack(push)' nested too deeply");
+    pp.pack_stack[pp.pack_depth++] = pp.pack;
+  } else if (pop) {
+    if (pp.pack_depth == 0)
+      warn_tok(W_CPP, start, "'#pragma pack(pop)' without a matching push");
+    else
+      pp.pack = pp.pack_stack[--pp.pack_depth];
+  }
+  if (value >= 0)
+    pp.pack = value;
+  else if (!push && !pop)
+    pp.pack = 0; // pack() restores natural alignment
+  return tok;
+}
+
 static Token *pragma_directive(Token *directive, Token *tok) {
+  if (tok_equal(tok, "pack") && tok_equal(tok->next, "(")) {
+    tok = pragma_pack(tok);
+    while (!tok->at_bol)
+      tok = tok->next;
+    return tok;
+  }
   if (tok_equal(tok, "once") && tok->next->at_bol) {
     hashmap_put(&pp.pragma_once, canonical_path(directive->file->path), (void *)1);
     return tok->next;
@@ -461,12 +513,18 @@ static Token *message_directive(Token *directive, Token *tok, bool is_error) {
   return tok;
 }
 
-// Removes a _Pragma("...") operator (C99 6.10.9).
+// Executes and removes a _Pragma("...") operator (C99 6.10.9); only
+// _Pragma("pack(...)") has an effect.
 static Token *pragma_operator(Token *tok) {
   Token *start = tok;
   tok = tok_skip(tok->next, "(");
   if (tok->kind != TK_STR)
     error_tok(start, "_Pragma takes a parenthesized string literal");
+  if (tok->str && starts_with(tok->str, "pack")) {
+    Token *line = pp_tokenize_text(tok->str, tok);
+    if (tok_equal(line, "pack") && tok_equal(line->next, "("))
+      pragma_pack(line);
+  }
   return tok_skip(tok->next, ")");
 }
 
@@ -488,6 +546,7 @@ static Token *preprocess2(Token *tok) {
     }
 
     if (!is_hash(tok)) {
+      tok->pack = (unsigned char)pp.pack;
       cur = cur->next = tok;
       tok = tok->next;
       continue;

@@ -206,11 +206,11 @@ Tyto projekty byly přeloženy occem na obou úrovních optimalizace a ověřeny
 | [bzip2](https://sourceware.org/bzip2/) 1.0.8 | 8 tis. řádků | vzorky z `make test` projdou; výstup bajt po bajtu shodný s GCC |
 | [LZ4](https://lz4.org) 1.10 | 18 tis. řádků | úrovně 1/9/12 shodné s GCC, komprese tam i zpět v pořádku |
 | [xxHash](https://xxhash.com) 0.8.3 | 12 tis. řádků | sanity test: projde 49948 vektorů; všechny čtyři hashe se shodují |
-| [Csmith](https://github.com/csmith-project/csmith) | náhodné | 500 vygenerovaných programů; jediný rozdíl oproti GCC byla chyba, už opravená |
+| [Csmith](https://github.com/csmith-project/csmith) | náhodné | přes 500 vygenerovaných programů; oba rozdíly oproti GCC byly chyby, už opravené |
 
 Každý z těchto běhů něco našel nebo potvrdil: sestavení Luy odhalilo dvě falešná varování,
 xxHash chybu v preprocesoru, Jim Tcl chybějící volbu `-rdynamic` a Csmith špatnou celočíselnou
-promoci bitových polí — vše je opravené a pokryté regresními testy.
+promoci bitových polí a ignorované `#pragma pack` — vše je opravené a pokryté regresními testy.
 
 ## Podpora C23
 
@@ -225,6 +225,7 @@ promoci bitových polí — vše je opravené a pokryté regresními testy.
 - `#embed`, `#elifdef` / `#elifndef`, `#warning`, `__has_include`, `__has_embed`,
   `__has_c_attribute`, `__VA_OPT__`
 - `static_assert` bez zprávy, prázdné inicializátory `= {}`
+- `#pragma pack` a `__attribute__((packed, aligned))` se stejným rozložením paměti jako v GCC
 - binární literály a oddělovače číslic (`0b1010'0101`)
 - návěští před deklaracemi a na konci bloků
 - nepojmenované parametry v definicích, `f()` ve významu `f(void)`

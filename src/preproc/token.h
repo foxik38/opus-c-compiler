@@ -59,6 +59,7 @@ struct Token {
   int str_len; // number of elements including the terminator
 
   // Preprocessor bookkeeping.
+  unsigned char pack; // #pragma pack in effect here: maximum member alignment (0 = none)
   Hideset *hideset;
   Token *origin; // macro name token this token was expanded from
 };

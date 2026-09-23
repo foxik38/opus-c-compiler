@@ -65,6 +65,7 @@ struct Type {
   Token *tag;
   bool is_flexible; // ends in a flexible array member
   bool is_packed;
+  int max_align;     // #pragma pack: cap on member alignment (0 = none)
   Type *next_copy; // qualified copies, updated when the type is completed
 
   // Enum.

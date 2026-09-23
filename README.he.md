@@ -233,10 +233,10 @@ examples/      small programs to try          tests/   runtime, diagnostic, benc
 | [bzip2](https://sourceware.org/bzip2/) 1.0.8 | ‏8 אלף שורות | הדוגמאות של `make test` עוברות; הפלט זהה בית אחר בית לזה של GCC |
 | [LZ4](https://lz4.org) 1.10 | ‏18 אלף שורות | רמות 1/9/12 זהות לפלט של GCC, דחיסה ופריסה תקינות |
 | [xxHash](https://xxhash.com) 0.8.3 | ‏12 אלף שורות | בדיקת השפיות: כל 49948 הווקטורים עוברים; כל ארבע פונקציות הגיבוב תואמות |
-| [Csmith](https://github.com/csmith-project/csmith) | אקראי | ‏500 תוכניות שנוצרו; ההבדל היחיד מ-GCC היה באג, שכבר תוקן |
+| [Csmith](https://github.com/csmith-project/csmith) | אקראי | יותר מ-500 תוכניות שנוצרו; שני ההבדלים מ-GCC היו באגים, שכבר תוקנו |
 
 כל אחת מההרצות האלה מצאה או אישרה משהו: הבנייה של Lua חשפה שתי אזהרות שווא, xxHash — באג
-בקדם-מעבד, Jim Tcl — אפשרות `-rdynamic` חסרה, ו-Csmith — קידום שגוי של שדות סיביות. הכול תוקן
+בקדם-מעבד, Jim Tcl — אפשרות `-rdynamic` חסרה, ו-Csmith — קידום שגוי של שדות סיביות והתעלמות מ-`#pragma pack`. הכול תוקן
 ומוגן בבדיקות רגרסיה.
 
 ## תמיכה ב-C23
@@ -252,6 +252,7 @@ examples/      small programs to try          tests/   runtime, diagnostic, benc
 - `#embed`,‏ `#elifdef` / `#elifndef`,‏ `#warning`,‏ `__has_include`,‏ `__has_embed`,
   `__has_c_attribute`,‏ `__VA_OPT__`
 - `static_assert` בלי הודעה, מאתחלים ריקים `= {}`
+- `#pragma pack` ו-`__attribute__((packed, aligned))`, עם פריסה בזיכרון זהה לזו של GCC
 - מספרים בינאריים ומפרידי ספרות (`0b1010'0101`)
 - תוויות לפני הצהרות ובסוף בלוקים
 - פרמטרים ללא שם בהגדרות, ו-`f()` במשמעות `f(void)`

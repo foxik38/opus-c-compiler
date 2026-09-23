@@ -229,6 +229,14 @@ Token *macro_define(Token *tok) {
   char *name = tok_text(tok);
   if (strcmp(name, "defined") == 0)
     error_tok(tok, "'defined' cannot be used as a macro name");
+  // glibc's <sys/cdefs.h> defines __attribute__ away for compilers that do
+  // not claim to be GCC. occ understands attributes (packed and aligned
+  // change struct layout), so that definition is ignored.
+  if (strcmp(name, "__attribute__") == 0 && tok->file && tok->file->is_system) {
+    while (!tok->next->at_bol && tok->next->kind != TK_EOF)
+      tok = tok->next;
+    return tok->next;
+  }
   tok = tok->next;
 
   bool is_objlike = true;

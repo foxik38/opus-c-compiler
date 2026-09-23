@@ -199,6 +199,13 @@ alongside. It paid off in exactly the places hand-written tests are weak:
   `int`, not `unsigned int`, because `int` holds all its values. occ used
   the declared type, which turned a comparison with a negative `short`
   upside down. One of 500 Csmith programs caught it.
+- **`#pragma pack` was ignored** (Csmith, in CI). Worse, glibc's
+  `<sys/cdefs.h>` defines `__attribute__` away for any compiler that does
+  not claim to be GCC, so `__attribute__((packed))` vanished too once a
+  system header was included. occ now implements `#pragma pack` (the
+  preprocessor stamps the value on every token, the struct layout reads it)
+  and ignores that one definition from system headers; layouts, packed
+  bit-fields included, match GCC byte for byte.
 
 The live display followed the same rule as the rest: it must never cost
 correctness or machine-readability. The spinner runs on a helper thread only

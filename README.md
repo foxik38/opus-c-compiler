@@ -202,11 +202,11 @@ These projects were built with occ at both optimization levels and checked with 
 | [bzip2](https://sourceware.org/bzip2/) 1.0.8 | 8k lines | its `make test` samples pass; output byte-identical to GCC's |
 | [LZ4](https://lz4.org) 1.10 | 18k lines | levels 1/9/12 byte-identical to GCC's, round trips OK |
 | [xxHash](https://xxhash.com) 0.8.3 | 12k lines | sanity test: 49948 vectors pass; all four hashes match |
-| [Csmith](https://github.com/csmith-project/csmith) | random | 500 generated programs; the one mismatch with GCC was a bug, now fixed |
+| [Csmith](https://github.com/csmith-project/csmith) | random | 500+ generated programs; the two mismatches with GCC were bugs, now fixed |
 
 Every one of these runs found or confirmed something: the Lua build exposed two false-positive
-warnings, xxHash a preprocessor bug, Jim Tcl a missing `-rdynamic` option and Csmith a wrong
-integer promotion of bit-fields — all fixed, with regression tests.
+warnings, xxHash a preprocessor bug, Jim Tcl a missing `-rdynamic` option, and Csmith a wrong
+integer promotion of bit-fields and ignored `#pragma pack` — all fixed, with regression tests.
 
 ## C23 support
 
@@ -221,6 +221,7 @@ integer promotion of bit-fields — all fixed, with regression tests.
 - `#embed`, `#elifdef` / `#elifndef`, `#warning`, `__has_include`, `__has_embed`,
   `__has_c_attribute`, `__VA_OPT__`
 - `static_assert` without a message, empty initializers `= {}`
+- `#pragma pack` and `__attribute__((packed, aligned))`, laid out exactly as GCC does
 - Binary literals and digit separators (`0b1010'0101`)
 - Labels before declarations and at the end of blocks
 - Unnamed parameters in definitions, `f()` meaning `f(void)`
