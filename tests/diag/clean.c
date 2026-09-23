@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int argc_like(void) { return 3; }
+
 typedef struct {
   const char *name;
   int score;
@@ -19,6 +21,20 @@ static unsigned hash(const char *s) {
   while (*s)
     h = (h ^ (unsigned char)*s++) * 16777619u;
   return h;
+}
+
+// Patterns from real code (Lua) that must not warn: an assignment whose
+// value is used is a read, and promoted unsigned narrow types are never
+// negative, so comparing them with unsigned values is safe.
+static int count_open(const int *levels, int level) {
+  int n = 0, current;
+  while ((current = *levels++) >= level)
+    n++;
+  return n;
+}
+
+static int fits(unsigned char byte, size_t size, unsigned short half, unsigned long wide) {
+  return (byte <= size) + (half != wide) + ((argc_like() & 0x7f) < size) + (size > (half < 3));
 }
 
 int main(int argc, char **argv) {
@@ -41,5 +57,7 @@ int main(int argc, char **argv) {
   free(copy);
   while (total > 1000)
     total /= 2;
+  static const int levels[] = {5, 4, 1};
+  total += count_open(levels, 2) + fits(7, n, 9, 10);
   return total > 255 ? 1 : 0;
 }

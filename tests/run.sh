@@ -15,6 +15,8 @@
 #   // expect-warning: <text>    stderr must contain "warning: <text>"
 #   // expect-error: <text>      stderr must contain "error: <text>"; build fails
 #   // expect-clean              no warnings at all
+# and nothing more: a warning is only accepted on a line whose expect-warning
+# marker is a prefix of its message.
 set -u
 shopt -s nullglob
 
@@ -121,6 +123,18 @@ run_diag() { # file
       expect-clean) [[ "$log" != *"warning:"* ]] || problems+="unexpected warnings"$'\n' ;;
     esac
   done < <(sed -n 's|^.*// \(expect-[a-z]*\(: .*\)\{0,1\}\)$|\1|p' "$src")
+
+  # Conversely, every warning must be expected on the line it points at.
+  while IFS= read -r w; do
+    local wline="${w#"$src":}"
+    wline="${wline%%:*}"
+    local wtext="${w#*: warning: }"
+    wtext="${wtext% \[-W*\]}"
+    local marker
+    marker=$(sed -n "${wline}s|^.*// expect-warning: ||p" "$src")
+    [[ -n "$marker" && "$wtext" == "$marker"* ]] ||
+      problems+="unexpected warning on line $wline: $wtext"$'\n'
+  done < <(grep "^$src:[0-9]*:[0-9]*: warning: " <<<"$log")
 
   if [[ $expect_error -eq 1 && $status -eq 0 ]]; then
     problems+="compilation succeeded but an error was expected"$'\n'

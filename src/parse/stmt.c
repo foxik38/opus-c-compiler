@@ -223,6 +223,7 @@ static Node *for_stmt(Token **rest, Token *tok) {
     tok = tok->next;
   } else {
     Node *e = expr(&tok, tok);
+    note_discarded(e);
     node->init = new_unary(ND_EXPR_STMT, e, e->tok);
     tok = tok_skip(tok, ";");
   }
@@ -233,8 +234,10 @@ static Node *for_stmt(Token **rest, Token *tok) {
   }
   tok = tok_skip(tok, ";");
 
-  if (!tok_equal(tok, ")"))
+  if (!tok_equal(tok, ")")) {
     node->inc = expr(&tok, tok);
+    note_discarded(node->inc);
+  }
   Token *rparen = tok;
   tok = tok_skip(tok, ")");
   check_empty_body(tok, rparen, "'for' loop", true);
@@ -313,6 +316,7 @@ static Node *expr_stmt(Token **rest, Token *tok) {
   Node *e = expr(&tok, tok);
   *rest = tok_skip(tok, ";");
   check_discarded_value(e);
+  note_discarded(e);
   return new_unary(ND_EXPR_STMT, e, e->tok);
 }
 

@@ -14,7 +14,7 @@ char *dangling_array(void) {
 int main(void) {
   int a = 10;
   int z = a / 0;          // expect-warning: division by zero is undefined behavior
-  int m = a % 0;
+  int m = a % 0;          // expect-warning: division by zero is undefined behavior
   int s1 = a << 32;       // expect-warning: shift count >= width of type 'int' (undefined behavior)
   int s2 = a >> -1;       // expect-warning: shift count is negative (undefined behavior)
   int o = INT_MAX + 1;    // expect-warning: overflow in expression; result is undefined behavior for type 'int'

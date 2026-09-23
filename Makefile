@@ -13,9 +13,11 @@ PREFIX  ?= /usr/local
 # Prefer -std=c23; older GCC/Clang spell it -std=c2x.
 STD     := $(shell $(CC) -std=c23 -E -x c /dev/null >/dev/null 2>&1 && echo c23 || echo c2x)
 
+# CFLAGS, CPPFLAGS and LDFLAGS are yours to override (make CFLAGS=-O0);
+# the flags occ cannot be built without are kept separately.
 CFLAGS  ?= -O2 -g
-CFLAGS  += -std=$(STD) -Wall -Wextra -Wshadow -Wno-unused-parameter -Wno-sign-compare
-CPPFLAGS += -Isrc -D_DEFAULT_SOURCE -DOCC_INSTALL_INCLUDE_DIR='"$(PREFIX)/lib/occ/include"'
+OCC_CFLAGS   := -std=$(STD) -Wall -Wextra -Wshadow -Wno-unused-parameter -Wno-sign-compare
+OCC_CPPFLAGS := -Isrc -D_DEFAULT_SOURCE -DOCC_INSTALL_INCLUDE_DIR='"$(PREFIX)/lib/occ/include"'
 
 SRCS    := $(sort $(shell find src -name '*.c'))
 OBJS    := $(SRCS:src/%.c=build/%.o)
@@ -26,17 +28,17 @@ DEPS    := $(OBJS:.o=.d)
 all: occ
 
 occ: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(OCC_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 build/%.o: src/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c -o $@ $<
+	$(CC) $(OCC_CPPFLAGS) $(CPPFLAGS) $(OCC_CFLAGS) $(CFLAGS) -MMD -MP -c -o $@ $<
 
 test: occ
 	@./tests/run.sh ./occ
 
 # Stage 2: occ compiled by occ (with optimizations enabled).
-OCC_FLAGS := -Isrc -D_DEFAULT_SOURCE -DOCC_INSTALL_INCLUDE_DIR='"$(PREFIX)/lib/occ/include"'
+OCC_FLAGS := $(OCC_CPPFLAGS)
 
 build/stage2/occ: occ $(SRCS)
 	@mkdir -p build/stage2

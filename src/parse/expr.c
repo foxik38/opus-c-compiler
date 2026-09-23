@@ -436,7 +436,35 @@ static bool is_string_literal_ptr(Node *node) {
   return node->kind == ND_ADDR && node->lhs->kind == ND_VAR && node->lhs->var->is_string_literal;
 }
 
-static Node *new_compare(NodeKind kind, Node *lhs, Node *rhs, Token *tok) {
+// True if an integer expression can never be negative, e.g. a promoted
+// unsigned char, a comparison, or x & 0x7f. A signed operand like that
+// cannot make a mixed-signedness comparison misbehave.
+static bool is_known_nonnegative(Node *n) {
+  int64_t v;
+  if (is_const_int(n, &v))
+    return v >= 0;
+  if (n->ty->is_unsigned || n->ty->kind == TY_BOOL)
+    return true;
+  switch (n->kind) {
+  case ND_CAST: // widening keeps the value
+    return is_integer(n->lhs->ty) && n->lhs->ty->size < n->ty->size && is_known_nonnegative(n->lhs);
+  case ND_EQ: case ND_NE: case ND_LT: case ND_LE: case ND_NOT: case ND_LOGAND: case ND_LOGOR:
+    return true;
+  case ND_BITAND:
+    return is_known_nonnegative(n->lhs) || is_known_nonnegative(n->rhs);
+  case ND_SHR: case ND_MOD:
+    return is_known_nonnegative(n->lhs);
+  case ND_DIV: case ND_BITOR: case ND_BITXOR:
+    return is_known_nonnegative(n->lhs) && is_known_nonnegative(n->rhs);
+  case ND_COND:
+    return is_known_nonnegative(n->then) && is_known_nonnegative(n->els);
+  default:
+    return false;
+  }
+}
+
+// `swapped`: the operands arrive reversed (a > b is parsed as b < a).
+static Node *new_compare(NodeKind kind, Node *lhs, Node *rhs, Token *tok, bool swapped) {
   lhs = rvalue(lhs);
   rhs = rvalue(rhs);
 
@@ -448,10 +476,11 @@ static Node *new_compare(NodeKind kind, Node *lhs, Node *rhs, Token *tok) {
       Node *signed_side = is_signed_integer(integer_promote(lhs->ty))   ? lhs
                           : is_signed_integer(integer_promote(rhs->ty)) ? rhs
                                                                         : nullptr;
-      int64_t v;
-      if (signed_side && !(is_const_int(signed_side, &v) && v >= 0))
+      if (signed_side && !is_known_nonnegative(signed_side)) {
+        Node *first = swapped ? rhs : lhs, *second = swapped ? lhs : rhs;
         warn_tok(W_SIGN_COMPARE, tok, "comparison of integers of different signs: '%s' and '%s'",
-                 type_name(lhs->ty), type_name(rhs->ty));
+                 type_name(first->ty), type_name(second->ty));
+      }
     }
     usual_arith_conv(&lhs, &rhs);
   } else if (is_pointer_like(lhs->ty) && is_pointer_like(rhs->ty)) {
@@ -792,6 +821,7 @@ Node *expr(Token **rest, Token *tok) {
   Node *node = assign(&tok, tok);
   while (tok_equal(tok, ",")) {
     Token *op = tok;
+    note_discarded(node);
     Node *rhs = rvalue(assign(&tok, tok->next));
     node = new_binary(ND_COMMA, rvalue(node), rhs, op);
     node->ty = rhs->ty;
@@ -810,17 +840,38 @@ int64_t const_expr(Token **rest, Token *tok) {
   return eval_int(node);
 }
 
+// The value of `e` is thrown away (expression statement, left operand of a
+// comma, cast to void, for-loop increment). A plain assignment to a variable
+// there only sets it, which is what "set but not used" counts.
+void note_discarded(Node *e) {
+  while (e->kind == ND_CAST && e->is_implicit) // (void) casts note their operand themselves
+    e = e->lhs;
+  switch (e->kind) {
+  case ND_ASSIGN:
+    if (e->lhs->kind == ND_VAR && tok_equal(e->tok, "="))
+      e->lhs->var->lhs_refs++;
+    return;
+  case ND_COMMA:
+    if (!e->is_compound_literal)
+      note_discarded(e->rhs); // the left operand was noted when the comma was built
+    return;
+  case ND_COND:
+    note_discarded(e->then);
+    note_discarded(e->els);
+    return;
+  default:
+    return;
+  }
+}
+
 Node *assign(Token **rest, Token *tok) {
   Node *node = conditional(&tok, tok);
 
   if (tok_equal(tok, "=")) {
     Token *op = tok;
     Node *rhs = assign(rest, tok->next);
-    if (node->kind == ND_VAR) {
-      node->var->lhs_refs++;
-      if (node->var->first_read == node->tok)
-        node->var->first_read = nullptr;
-    }
+    if (node->kind == ND_VAR && node->var->first_read == node->tok)
+      node->var->first_read = nullptr; // the target of '=' is not a read
     return new_assign(node, rhs, op);
   }
 
@@ -947,12 +998,12 @@ static Node *make_binary(const BinOp *op, Node *lhs, Node *rhs, Token *tok) {
   case ND_LOGAND:
     return new_logical(ND_LOGAND, lhs, rhs, tok);
   case ND_EQ: case ND_NE:
-    return new_compare(op->kind, lhs, rhs, tok);
+    return new_compare(op->kind, lhs, rhs, tok, false);
   case ND_LT: case ND_LE:
     // a > b is b < a, a >= b is b <= a.
     if (op->op[0] == '>')
-      return new_compare(op->kind, rhs, lhs, tok);
-    return new_compare(op->kind, lhs, rhs, tok);
+      return new_compare(op->kind, rhs, lhs, tok, true);
+    return new_compare(op->kind, lhs, rhs, tok, false);
   case ND_ADD:
     return new_add(lhs, rhs, tok);
   case ND_SUB:
@@ -1015,6 +1066,7 @@ static Node *compound_literal(Token **rest, Token *tok, Type *ty, Token *start) 
 static Node *explicit_cast(Node *e, Type *ty, Token *tok) {
   e = rvalue(e);
   if (ty->kind == TY_VOID) {
+    note_discarded(e);
     Node *n = new_cast(e, ty_void);
     n->tok = tok;
     return n;

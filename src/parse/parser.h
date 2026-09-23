@@ -140,6 +140,7 @@ Type *initializer_type(Token *tok, Type *ty);
 
 Node *expr(Token **rest, Token *tok);
 Node *assign(Token **rest, Token *tok);
+void note_discarded(Node *e);
 Node *conditional(Token **rest, Token *tok);
 int64_t const_expr(Token **rest, Token *tok);
 
