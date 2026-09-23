@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="occ — Opus C Compiler" width="520">
+<img src="docs/assets/logo.svg" alt="occ — C23 fordító x86-64 Linuxra" width="640">
 
 **C23 fordító x86-64 Linuxra, C23-ban írva, amely önmagát is le tudja fordítani.**<br>
 Saját előfeldolgozó, elemző, optimalizáló és kódgenerátor — és egy fordítás, amelyet végig lehet követni.
@@ -25,21 +25,21 @@ Saját előfeldolgozó, elemző, optimalizáló és kódgenerátor — és egy f
 
 ## Főbb jellemzők
 
-- 🧩 **A teljes fordítási folyamat** — az előfeldolgozó, az elemző a típusellenőrzéssel, az
+- 🧩 **A teljes fordítási folyamat** — az előfeldolgozó, a típusellenőrzést is végző elemző, az
   optimalizáló és az x86-64 kódgenerátor az occ saját munkája; az utolsó lépést a GNU `as` és `ld`
   végzi, amelyeket az occ közvetlenül hív meg.
-- 📺 **Követhető fordítás** — minden fázis jelenti, hogy `OK` vagy `ERR`, mennyi CPU- és valós
-  időt vett igénybe, és mit állított elő. Terminálban a futó fázisok animálva jelennek meg, az
+- 📺 **Követhető fordítás** — minden fázis kiírja az állapotát (`OK` vagy `ERR`), a felhasznált
+  CPU- és valós időt, valamint azt, hogy mit állított elő. Terminálban a futó fázisok animálva jelennek meg, az
   összesítés pedig megmutatja, melyik fázis mennyi időt vitt el.
 - 🩺 **Segítőkész diagnosztika** — GCC-stílusú üzenetek forráskód-részlettel, `help:` tipp a
-  gyakori hibákhoz, és 27 névvel ellátott figyelmeztetés, amelyek a nem definiált viselkedésre és
+  gyakori hibákhoz, és 27 saját névvel rendelkező figyelmeztetés, amelyek a nem definiált viselkedésre és
   az elavult szerkezetekre összpontosítanak.
-- 🚀 **Két optimalizálási szint** — `-o none` a nyilvánvalóan helyes kódhoz, `-o prod`
-  regiszterkiosztással, címzési módokkal, konstanskiértékeléssel, műveletegyszerűsítéssel, a
-  ciklusinvariáns kód kiemelésével, ugrótáblákkal és peephole optimalizálással. Ciklusokkal teli
+- 🚀 **Két optimalizálási szint** — a `-o none` nyilvánvalóan helyes kódot ad, a `-o prod`
+  pedig regiszterkiosztást, címzési módokat, konstanskiértékelést, a drága műveletek olcsóbbra
+  cserélését, a ciklusinvariáns kód kiemelését, ugrótáblákat és peephole optimalizálást alkalmaz. Ciklusokkal teli
   kódon megközelíti a `gcc -O2` szintjét.
 - ✨ **C23** — `constexpr`, `auto`, `typeof`, `nullptr`, `bool`, `#embed`, attribútumok,
-  `<stdckdint.h>`, rögzített típusú felsorolások, számjegy-elválasztók és még sok más.
+  `<stdckdint.h>`, rögzített alaptípusú felsorolások, számjegy-elválasztók és még sok más.
 - 🧪 **Valódi programokon bizonyítva** — az SQLite, a Lua, a zlib, a Duktape és társaik
   lefordulnak az occ-vel, és átmennek a saját tesztjeiken; az occ önmagát is lefordítja, egészen a
   fixpontig (bootstrap fixpoint).
@@ -93,7 +93,7 @@ kimenet egyszerű szöveg, fázisonként egy sor.
 
 ## Diagnosztika
 
-Ha valami elromlik, a hibás fázis `ERR`-re vált, és jönnek a diagnosztikai üzenetek — mindegyik a
+Ha valami elromlik, a hibás fázis `ERR`-re vált, majd következnek a diagnosztikai üzenetek — mindegyik a
 helyével, a forráskód sorával, a figyelmeztetés nevével és, ahol a javítás kézenfekvő, egy tippel:
 
 <div align="center">
@@ -150,10 +150,10 @@ függvénydefiníció (a C23 óta).
 <img src="docs/assets/pipeline.svg" alt="Az occ fordítási folyamata: preprocess, compile (parse, optimize, codegen), assemble, link" width="860">
 </div>
 
-Az elemző teljesen típusos AST-t épít, amelyben minden implicit átalakítás explicit típuskényszerítés,
-így a kódgenerátornak nem kell újra kitalálnia a C átalakítási szabályait. A `-o none` egy
-egyszerű akkumulátoros veremgép — nyilvánvalóan helyes, és ez a referencia, amelyhez a `-o prod`
-szintet tesztelik. A `-o prod` megtartja a vázát, és megszünteti a költségeit:
+Az elemző teljesen típusos AST-t épít, amelyben minden implicit konverzió explicit típuskonverzióként
+szerepel, így a kódgenerátornak már nem kell a C konverziós szabályaival foglalkoznia. A `-o none`
+egy egyszerű akkumulátoros veremgép — nyilvánvalóan helyes, ezért ez a referencia, amelyhez a
+`-o prod` kimenetét mérjük. A `-o prod` ugyanerre a vázra épül, csak a többletköltségeit szünteti meg:
 
 | | `-o none` | `-o prod` |
 |---|---|---|
@@ -161,29 +161,29 @@ szintet tesztelik. A `-o prod` megtartja a vázát, és megszünteti a költség
 | Részeredmények | `push`/`pop` | segédregiszterek: `%r8`–`%r11`, `%xmm8`–`%xmm11` |
 | Memóriaelérés | cím a `%rax`-ben, majd betöltés | `disp(base, index, scale)` operandusok, olvasás-módosítás-írás, közvetlen konstansírás |
 | Vezérlés | feltétel a ciklus elején | hátul tesztelő ciklusok, közvetlen `cmp`+`jcc`, ugrótáblák sűrű `switch`-hez |
-| AST-menetek | — | konstanskiértékelés, algebrai azonosságok, műveletegyszerűsítés, halott ágak, ciklusinvariáns kód kiemelése |
+| AST-menetek | — | konstanskiértékelés, algebrai azonosságok, drága műveletek olcsóbbra cserélése, elérhetetlen ágak elhagyása, ciklusinvariáns kód kiemelése |
 | Utómunka | — | peephole optimalizálás |
 
 ```text
 src/
-├── support/   vektorok, sztringek, hash tábla, forrásfájlok, diagnosztika, időzítők
+├── support/   vektorok, sztringek, hash-tábla, forrásfájlok, diagnosztika, időzítők
 ├── preproc/   lexer, makrókifejtés (Prosser-féle hidesetek), direktívák, #if kiértékelése
 ├── parse/     deklarációk, kifejezések, utasítások, inicializálók, típusok, hatókörök,
 │              konstansok kiértékelése és a legtöbb figyelmeztetés mögötti statikus ellenőrzés
-├── opt/       AST-menetek a -o prod szinthez: összevonás és egyszerűsítés, kódkiemelés ciklusokból
+├── opt/       AST-menetek a -o prod szinthez: konstansok összevonása, egyszerűsítés, kódkiemelés ciklusokból
 ├── codegen/   kifejezések, utasítások, hívások és a SysV ABI, adatok, regiszterek, peephole
 └── driver/    parancssor, fordítási folyamat, élő állapotkijelzés, külső eszközök
 include/       az occ saját, önálló fejlécfájljai (stddef.h, stdarg.h, stdckdint.h, ...)
 examples/      kipróbálható kis programok     tests/   futási, diagnosztikai, teljesítmény- és fuzz-tesztek
 ```
 
-Hogy miért épül így fel az occ — és mi romlott el menet közben —, azt a
+Azt, hogy miért ilyen az occ felépítése — és mi romlott el menet közben —, a
 [**THINKPROC.md**](THINKPROC.md) írja le (angolul).
 
 ## Teljesítmény
 
 A [`tests/bench`](tests/bench) benchmarkjainak legjobb eredménye 3 futásból (`make bench`; minden
-változat ugyanazt az ellenőrzőösszeget írja ki). A rövidebb a gyorsabb.
+változat ugyanazt az ellenőrzőösszeget írja ki). A rövidebb oszlop gyorsabb kódot jelent.
 
 <div align="center">
 <img src="docs/assets/benchmarks.svg" alt="A benchmarkok futásideje occ -o none, occ -o prod, gcc -O0 és gcc -O2 esetén" width="720">
@@ -191,7 +191,7 @@ változat ugyanazt az ellenőrzőösszeget írja ki). A rövidebb a gyorsabb.
 
 A `-o prod` mindenhol gyorsabb a `gcc -O0`-nál, és hat benchmarkból négyben legfeljebb 20%-kal marad
 el a `gcc -O2`-től. A megmaradt különbség a sok függvényhívást tartalmazó kódban (`fib`: az occ nem
-inline-ol) és a vektorizálható ciklusokban (`matmul`) van. Egy nagy, valódi programon is hasonló a
+végez inline-olást) és a vektorizálható ciklusokban (`matmul`) van. Egy nagy, valódi programon is hasonló a
 kép: az SQLite `speedtest1` tesztje 1,74 s alatt fut le `occ -o prod`-dal, 4,19 s alatt
 `-o none`-nal és 0,90 s alatt `gcc -O2`-vel. A mérések megosztott gépen készültek, nagyjából ±10%
 zajjal kell számolni.
@@ -203,7 +203,7 @@ Az alábbi projekteket az occ mindkét optimalizálási szinten lefordította, �
 
 | Projekt | Méret | Eredmény `-o none` és `-o prod` szinten |
 |---|---:|---|
-| [SQLite](https://sqlite.org) 3.53 + shell | 307 ezer sor | az SQL-feladatok kimenete megegyezik a GCC-s változatéval; a `speedtest1` ellenőrző hash-e azonos |
+| [SQLite](https://sqlite.org) 3.53 + shell | 307 ezer sor | az SQL-lekérdezések kimenete megegyezik a GCC-s változatéval; a `speedtest1` ellenőrző hash-e azonos |
 | [Lua](https://www.lua.org) 5.4.9 | 30 ezer sor | tesztszkript: azonos kimenet |
 | [Duktape](https://duktape.org) 2.7 | 108 ezer sor | JavaScript tesztszkript: azonos kimenet |
 | [MuJS](https://mujs.com) 1.3.9 | 20 ezer sor | JavaScript tesztszkript: azonos kimenet |
@@ -211,12 +211,13 @@ Az alábbi projekteket az occ mindkét optimalizálási szinten lefordította, �
 | [zlib](https://zlib.net) 1.3.2 | 25 ezer sor | az `example` sikeres; a `minigzip` kimenete bájtra egyezik a GCC-sével |
 | [bzip2](https://sourceware.org/bzip2/) 1.0.8 | 8 ezer sor | a `make test` mintái átmennek; a kimenet bájtra egyezik a GCC-sével |
 | [LZ4](https://lz4.org) 1.10 | 18 ezer sor | az 1/9/12-es szint kimenete egyezik a GCC-sével, oda-vissza tömörítés rendben |
-| [xxHash](https://xxhash.com) 0.8.3 | 12 ezer sor | sanity teszt: mind a 49948 vektor sikeres; mind a négy hash egyezik |
+| [xxHash](https://xxhash.com) 0.8.3 | 12 ezer sor | önellenőrző teszt (sanity test): mind a 49948 vektor sikeres; mind a négy hash egyezik |
 | [Csmith](https://github.com/csmith-project/csmith) | véletlen | több mint 500 generált program; a két eltérés a GCC-hez képest hiba volt, már javítva |
 
 Mindegyik futás talált vagy megerősített valamit: a Lua fordítása két téves figyelmeztetést
 leplezett le, az xxHash egy előfeldolgozó-hibát, a Jim Tcl egy hiányzó `-rdynamic` kapcsolót, a Csmith
-pedig a bitmezők hibás egész-előléptetését és a figyelmen kívül hagyott `#pragma pack`-et — mindet javítottuk, és regressziós tesztek védik őket.
+pedig a bitmezők hibás egészpromócióját (integer promotion) és a figyelmen kívül hagyott
+`#pragma pack`-et — mindet javítottuk, és regressziós tesztek védik őket.
 
 ## C23-támogatás
 
@@ -247,7 +248,7 @@ pedig a bitmezők hibás egész-előléptetését és a figyelmen kívül hagyot
 <details>
 <summary>Ami (még) nincs</summary>
 
-- változó hosszúságú tömbök (VLA) — hibával elutasítva (a C11 óta opcionálisak)
+- változó hosszúságú tömbök (VLA) — az occ hibaüzenettel elutasítja őket (a C11 óta opcionálisak)
 - `_BitInt(N)`, `_Complex`, decimális lebegőpontos számok
 - a `long double` `double`-ként fordul; az `_Atomic` atomi szemantika nélkül elfogadott (mindkettőt
   jelzi a `-Wunsupported`)
@@ -263,7 +264,7 @@ Az újdonságok bemutatója az [`examples/c23_tour.c`](examples/c23_tour.c) fáj
 ```sh
 make test                   # futási és diagnosztikai tesztek -o none és -o prod szinten
 tests/run.sh --reference    # maguknak a futási teszteknek az ellenőrzése GCC-vel
-make selfhost               # az occ lefordítja az occ-t; az 1. és 2. fázisnak azonos assemblert kell adnia
+make selfhost               # az occ lefordítja önmagát; az 1. és a 2. generációnak azonos assemblykódot kell adnia
 make fuzz FUZZ_COUNT=1000   # véletlen, UB-mentes programok, occ kontra GCC
 tests/fuzz/csmith.py        # Csmith által generált programok, occ kontra GCC (csmith kell hozzá)
 make bench                  # a fenti grafikon
@@ -283,6 +284,12 @@ A tervezés mögötti gondolatmenetet, a menet közben talált hibákat és azt,
 [THINKPROC.md](THINKPROC.md) írja le.
 
 <br clear="left">
+
+## Közreműködés
+
+A legértékesebb hozzájárulás a hibajelentés — különösen egy olyan C program, amelyet az occ
+másképp fordít le, mint a GCC. A részletek a [CONTRIBUTING.md](CONTRIBUTING.md) fájlban olvashatók;
+lásd még a [változásnaplót](CHANGELOG.md) és a [biztonsági irányelveket](SECURITY.md) (angolul).
 
 ## Licenc
 

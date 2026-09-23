@@ -1,9 +1,9 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="occ — Opus C Compiler" width="520">
+<img src="docs/assets/logo.svg" alt="occ — překladač C23 pro x86-64 Linux" width="640">
 
 **Překladač jazyka C23 pro x86-64 Linux, napsaný v C23, který přeloží i sám sebe.**<br>
-Vlastní preprocesor, parser, optimalizátor i generátor kódu — a překlad, který vidíte.
+Vlastní preprocesor, parser, optimalizátor i generátor kódu — a průběh překladu, který můžete sledovat.
 
 [![CI](https://github.com/foxik38/opus-c-compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/foxik38/opus-c-compiler/actions/workflows/ci.yml)
 ![C23](https://img.shields.io/badge/language-C23-5fafff)
@@ -28,16 +28,17 @@ Vlastní preprocesor, parser, optimalizátor i generátor kódu — a překlad, 
 - 🧩 **Celý průběh překladu** — preprocesor, parser s typovou kontrolou, optimalizátor
   i generátor kódu pro x86-64 jsou vlastní; poslední krok obstarají GNU `as` a `ld`, které occ
   volá přímo.
-- 📺 **Překlad, který vidíte** — každá fáze hlásí `OK`/`ERR`, čas CPU i reálný čas a co vytvořila.
-  V terminálu se běžící fáze animují a souhrn ukáže, kolik času zabrala která fáze.
+- 📺 **Překlad, který můžete sledovat** — každá fáze hlásí `OK`/`ERR`, čas CPU i reálný čas a co vytvořila.
+  V terminálu jsou běžící fáze animované a souhrn ukáže, kolik času která fáze zabrala.
 - 🩺 **Diagnostika, která pomáhá** — hlášení ve stylu GCC s ukázkou zdrojového kódu, nápověda
   `help:` u častých chyb a 27 pojmenovaných varování zaměřených na nedefinované chování a zastaralé
   konstrukce.
-- 🚀 **Dvě úrovně optimalizace** — `-o none` pro zjevně správný kód, `-o prod` pro alokaci
-  registrů, adresní režimy, skládání konstant, zjednodušování operací, přesun invariantního kódu
-  ze smyček, skokové tabulky a peephole optimalizace. U kódu se smyčkami se blíží `gcc -O2`.
+- 🚀 **Dvě úrovně optimalizace** — `-o none` pro zjevně správný kód, `-o prod` přidává alokaci
+  registrů, adresní režimy, skládání konstant, náhradu drahých operací levnějšími, vytýkání
+  invariantního kódu ze smyček, skokové tabulky a peephole optimalizace. U kódu s mnoha smyčkami se
+  výkonem blíží `gcc -O2`.
 - ✨ **C23** — `constexpr`, `auto`, `typeof`, `nullptr`, `bool`, `#embed`, atributy,
-  `<stdckdint.h>`, výčty s pevným typem, oddělovače číslic a další.
+  `<stdckdint.h>`, výčtové typy s pevným podkladovým typem, oddělovače číslic a další.
 - 🧪 **Prověřeno na skutečných programech** — SQLite, Lua, zlib, Duktape a další se přeloží
   occem a projdou vlastními testy; occ přeloží sám sebe až do pevného bodu (bootstrap fixpoint).
 
@@ -89,7 +90,7 @@ animace v terminálu. Když stderr není terminál, výstup je prostý text, jed
 
 ## Diagnostika
 
-Když se něco pokazí, fáze, která selhala, se změní na `ERR` a následuje diagnostika — každé
+Když se něco pokazí, u fáze, která selhala, se objeví `ERR` a následuje diagnostika — každé
 hlášení s umístěním, řádkem zdrojového kódu, jménem varování a tam, kde je oprava zřejmá,
 i s nápovědou:
 
@@ -134,7 +135,7 @@ ta označená **UB** upozorňují na kód, jehož chování norma C nedefinuje.
 | `cpp` | direktiva `#warning` |
 | `unsupported` | konstrukce přijatá, ale occ ji jen aproximuje |
 
-Odstraněné konstrukce jsou tvrdé chyby: implicitní `int` a implicitní deklarace funkcí (odstraněny
+Konstrukce, které byly z jazyka odstraněny, jsou rovnou chybami: implicitní `int` a implicitní deklarace funkcí (odstraněny
 v C99), `gets()` (odstraněna v C11) a definice funkcí ve stylu K&R (odstraněny v C23).
 
 </details>
@@ -145,10 +146,10 @@ v C99), `gets()` (odstraněna v C11) a definice funkcí ve stylu K&R (odstraněn
 <img src="docs/assets/pipeline.svg" alt="Průběh překladu v occ: preprocess, compile (parse, optimize, codegen), assemble, link" width="860">
 </div>
 
-Parser vytváří plně otypovaný AST, ve kterém je každý implicitní převod explicitním přetypováním,
-takže generátor kódu nemusí znovu objevovat pravidla převodů jazyka C. `-o none` je jednoduchý
-zásobníkový stroj s akumulátorem — zjevně správný a zároveň referenční, proti němuž se testuje
-`-o prod`. `-o prod` zachovává jeho kostru a odstraňuje jeho náklady:
+Parser vytváří plně otypovaný AST, v němž je každý implicitní převod zapsán jako explicitní
+přetypování, takže generátor kódu už pravidla převodů jazyka C řešit nemusí. `-o none` je jednoduchý
+zásobníkový stroj s akumulátorem — zjevně správný, a proto slouží jako reference, proti které se
+testuje `-o prod`. Ten zachovává stejnou kostru, jen odstraňuje její režii:
 
 | | `-o none` | `-o prod` |
 |---|---|---|
@@ -156,7 +157,7 @@ zásobníkový stroj s akumulátorem — zjevně správný a zároveň referenč
 | Mezivýsledky | `push`/`pop` | pomocné registry `%r8`–`%r11`, `%xmm8`–`%xmm11` |
 | Přístup do paměti | adresa v `%rax`, pak načtení | operandy `disp(base, index, scale)`, čtení-úprava-zápis, přímé zápisy konstant |
 | Řízení toku | test na začátku smyčky | smyčky s podmínkou na konci, přímé `cmp`+`jcc`, skokové tabulky pro husté `switch` |
-| Průchody AST | — | skládání konstant, algebraické identity, zjednodušování operací, mrtvé větve, přesun invariantního kódu ze smyček |
+| Průchody AST | — | skládání konstant, algebraické identity, náhrada drahých operací, mrtvé větve, přesun invariantního kódu ze smyček |
 | Úklid | — | peephole optimalizace |
 
 ```text
@@ -178,7 +179,7 @@ Proč je occ postavený právě takhle — a co se cestou pokazilo — popisuje
 ## Výkon
 
 Nejlepší ze 3 běhů benchmarků v [`tests/bench`](tests/bench) (`make bench`; všechna sestavení
-vypíšou stejný kontrolní součet). Kratší je rychlejší.
+vypíšou stejný kontrolní součet). Kratší sloupec znamená rychlejší kód.
 
 <div align="center">
 <img src="docs/assets/benchmarks.svg" alt="Časy benchmarků pro occ -o none, occ -o prod, gcc -O0 a gcc -O2" width="720">
@@ -192,12 +193,12 @@ a 0,90 s s `gcc -O2`. Čísla pocházejí ze sdíleného stroje, počítejte se 
 
 ## Ověřeno na skutečném kódu
 
-Tyto projekty byly přeloženy occem na obou úrovních optimalizace a ověřeny vlastními testy
+Tyto projekty byly přeloženy occem na obou úrovních optimalizace a ověřeny jejich vlastními testy
 (nebo bajt po bajtu proti sestavení stejného kódu pomocí GCC):
 
 | Projekt | Velikost | Výsledek s `-o none` i `-o prod` |
 |---|---:|---|
-| [SQLite](https://sqlite.org) 3.53 + shell | 307 tis. řádků | SQL úlohy dávají stejný výstup jako sestavení GCC; ověřovací hash `speedtest1` se shoduje |
+| [SQLite](https://sqlite.org) 3.53 + shell | 307 tis. řádků | sada SQL dotazů dává stejný výstup jako sestavení GCC; ověřovací hash `speedtest1` se shoduje |
 | [Lua](https://www.lua.org) 5.4.9 | 30 tis. řádků | testovací skript: stejný výstup |
 | [Duktape](https://duktape.org) 2.7 | 108 tis. řádků | testovací skript v JavaScriptu: stejný výstup |
 | [MuJS](https://mujs.com) 1.3.9 | 20 tis. řádků | testovací skript v JavaScriptu: stejný výstup |
@@ -209,8 +210,9 @@ Tyto projekty byly přeloženy occem na obou úrovních optimalizace a ověřeny
 | [Csmith](https://github.com/csmith-project/csmith) | náhodné | přes 500 vygenerovaných programů; oba rozdíly oproti GCC byly chyby, už opravené |
 
 Každý z těchto běhů něco našel nebo potvrdil: sestavení Luy odhalilo dvě falešná varování,
-xxHash chybu v preprocesoru, Jim Tcl chybějící volbu `-rdynamic` a Csmith špatnou celočíselnou
-promoci bitových polí a ignorované `#pragma pack` — vše je opravené a pokryté regresními testy.
+xxHash chybu v preprocesoru, Jim Tcl chybějící volbu `-rdynamic` a Csmith chybné celočíselné
+rozšíření (integer promotion) bitových polí a ignorování `#pragma pack` — vše je opravené a pokryté
+regresními testy.
 
 ## Podpora C23
 
@@ -231,8 +233,8 @@ promoci bitových polí a ignorované `#pragma pack` — vše je opravené a pok
 - nepojmenované parametry v definicích, `f()` ve významu `f(void)`
 - kontrolovaná aritmetika `<stdckdint.h>` (přesná pro každou kombinaci typů operandů),
   `unreachable()`, znakové konstanty `u8`
-- vše, co čekáte z C99/C11: designované inicializátory, složené literály, flexibilní pole ve
-  strukturách, anonymní struktury a uniony, `_Generic`, `_Alignas`/`_Alignof`, `_Thread_local`,
+- vše, co čekáte z C99/C11: inicializátory s označením členů (designated initializers), složené
+  literály, flexibilní pole na konci struktur, anonymní struktury a uniony, `_Generic`, `_Alignas`/`_Alignof`, `_Thread_local`,
   variadické funkce, bitová pole, `setjmp`/`longjmp`, předávání a vracení struktur hodnotou
   (SysV ABI)
 
@@ -241,11 +243,11 @@ promoci bitových polí a ignorované `#pragma pack` — vše je opravené a pok
 <details>
 <summary>Co (zatím) ne</summary>
 
-- pole proměnné délky (VLA) — odmítnutá s chybou (od C11 nepovinná)
-- `_BitInt(N)`, `_Complex`, desítková plovoucí čárka
+- pole proměnné délky (VLA) — occ je odmítne s chybou (od C11 jsou nepovinná)
+- `_BitInt(N)`, `_Complex`, desítková čísla s plovoucí řádovou čárkou
 - `long double` se překládá jako `double`; `_Atomic` se přijme bez atomické sémantiky (obojí hlásí
   `-Wunsupported`)
-- příkazové výrazy GNU a rozšířený `asm` (základní `asm("...")` funguje)
+- příkazové výrazy GNU (statement expressions) a rozšířený `asm` (základní `asm("...")` funguje)
 - jiné cíle než x86-64 Linux s glibc — záměrně
 
 </details>
@@ -257,7 +259,7 @@ Ukázky novinek najdete v [`examples/c23_tour.c`](examples/c23_tour.c).
 ```sh
 make test                   # běhové a diagnostické testy s -o none i -o prod
 tests/run.sh --reference    # ověří samotné běhové testy pomocí GCC
-make selfhost               # occ přeloží occ; fáze 1 a 2 musí vygenerovat stejný assembler
+make selfhost               # occ přeloží sám sebe; 1. a 2. generace musí vygenerovat stejný assembler
 make fuzz FUZZ_COUNT=1000   # náhodné programy bez UB, occ proti GCC
 tests/fuzz/csmith.py        # programy z Csmith, occ proti GCC (vyžaduje csmith)
 make bench                  # graf výše
@@ -271,10 +273,16 @@ varování, které occ vypíše, musí být očekávané. CI spouští vše vý�
 <img src="https://cdn.simpleicons.org/claude/D97757" alt="Claude" width="40" align="left">
 
 occ navrhl, napsal, otestoval a zdokumentoval Claude (model umělé inteligence od Anthropicu),
-který tento repozitář spravuje: každý commit, test i stránku dokumentace. Úvahy za návrhem,
-chyby nalezené po cestě a to, jak se na ně přišlo, popisuje [THINKPROC.md](THINKPROC.md).
+který tento repozitář spravuje: každý commit, test i stránku dokumentace. Úvahy, na nichž návrh
+stojí, chyby nalezené po cestě a to, jak se na ně přišlo, popisuje [THINKPROC.md](THINKPROC.md).
 
 <br clear="left">
+
+## Přispívání
+
+Nejcennějším příspěvkem je hlášení chyby — hlavně program v C, který occ přeloží jinak než GCC.
+Podrobnosti jsou v [CONTRIBUTING.md](CONTRIBUTING.md), dále je k dispozici [seznam změn](CHANGELOG.md)
+a [bezpečnostní zásady](SECURITY.md) (anglicky).
 
 ## Licence
 

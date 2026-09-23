@@ -1,52 +1,70 @@
-<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="1010" height="290" viewBox="0 0 1010 290">
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="1018" height="318" viewBox="0 0 1018 318">
 <style>
-text{font-family:'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace;font-size:14px;white-space:pre;fill:#cdd6f4}
-.b{font-weight:700}.d{opacity:.62}
-@keyframes l0{0%,0.00%{opacity:0}0.01%,97%{opacity:1}100%{opacity:0}}
-.l0{animation:l0 9.56s steps(1) infinite}
-@keyframes l1{0%,19.67%{opacity:0}19.68%,97%{opacity:1}100%{opacity:0}}
-.l1{animation:l1 9.56s steps(1) infinite}
-@keyframes l2{0%,22.59%{opacity:0}22.60%,97%{opacity:1}100%{opacity:0}}
-.l2{animation:l2 9.56s steps(1) infinite}
-@keyframes l3{0%,25.52%{opacity:0}25.53%,97%{opacity:1}100%{opacity:0}}
-.l3{animation:l3 9.56s steps(1) infinite}
-@keyframes l4{0%,28.45%{opacity:0}28.46%,97%{opacity:1}100%{opacity:0}}
-.l4{animation:l4 9.56s steps(1) infinite}
-@keyframes l5{0%,31.38%{opacity:0}31.39%,97%{opacity:1}100%{opacity:0}}
-.l5{animation:l5 9.56s steps(1) infinite}
-@keyframes l6{0%,34.31%{opacity:0}34.32%,97%{opacity:1}100%{opacity:0}}
-.l6{animation:l6 9.56s steps(1) infinite}
-@keyframes l7{0%,37.24%{opacity:0}37.25%,97%{opacity:1}100%{opacity:0}}
-.l7{animation:l7 9.56s steps(1) infinite}
-@keyframes l8{0%,40.17%{opacity:0}40.18%,97%{opacity:1}100%{opacity:0}}
-.l8{animation:l8 9.56s steps(1) infinite}
-@keyframes l9{0%,43.10%{opacity:0}43.11%,97%{opacity:1}100%{opacity:0}}
-.l9{animation:l9 9.56s steps(1) infinite}
-@keyframes l10{0%,46.03%{opacity:0}46.04%,97%{opacity:1}100%{opacity:0}}
-.l10{animation:l10 9.56s steps(1) infinite}
-@keyframes l11{0%,48.95%{opacity:0}48.96%,97%{opacity:1}100%{opacity:0}}
-.l11{animation:l11 9.56s steps(1) infinite}
-@keyframes type{0%{width:0}14.64%,100%{width:151.2px}}
-.typing{animation:type 9.56s steps(18) infinite}
+text{font-family:'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace;font-size:14px;white-space:pre;fill:#f5f5f5}
+.b{font-weight:700}.d{opacity:.55}
+@keyframes s0{0%,2.65%{transform:scaleX(0)}12.36%,100%{transform:scaleX(1)}}
+.s0{transform-box:fill-box;transform-origin:0 0;animation:s0 11.32s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes s1{0%,15.46%{transform:scaleX(0)}18.68%,100%{transform:scaleX(1)}}
+.s1{transform-box:fill-box;transform-origin:0 0;animation:s1 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s2{0%,19.29%{transform:scaleX(0)}21.20%,100%{transform:scaleX(1)}}
+.s2{transform-box:fill-box;transform-origin:0 0;animation:s2 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s3{0%,21.82%{transform:scaleX(0)}26.68%,100%{transform:scaleX(1)}}
+.s3{transform-box:fill-box;transform-origin:0 0;animation:s3 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s4{0%,27.30%{transform:scaleX(0)}32.15%,100%{transform:scaleX(1)}}
+.s4{transform-box:fill-box;transform-origin:0 0;animation:s4 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s5{0%,32.77%{transform:scaleX(0)}36.82%,100%{transform:scaleX(1)}}
+.s5{transform-box:fill-box;transform-origin:0 0;animation:s5 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s6{0%,37.44%{transform:scaleX(0)}42.30%,100%{transform:scaleX(1)}}
+.s6{transform-box:fill-box;transform-origin:0 0;animation:s6 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s7{0%,42.92%{transform:scaleX(0)}47.78%,100%{transform:scaleX(1)}}
+.s7{transform-box:fill-box;transform-origin:0 0;animation:s7 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s8{0%,48.39%{transform:scaleX(0)}52.77%,100%{transform:scaleX(1)}}
+.s8{transform-box:fill-box;transform-origin:0 0;animation:s8 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s9{0%,53.38%{transform:scaleX(0)}58.24%,100%{transform:scaleX(1)}}
+.s9{transform-box:fill-box;transform-origin:0 0;animation:s9 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s10{0%,58.86%{transform:scaleX(0)}62.99%,100%{transform:scaleX(1)}}
+.s10{transform-box:fill-box;transform-origin:0 0;animation:s10 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes s11{0%,63.61%{transform:scaleX(0)}68.47%,100%{transform:scaleX(1)}}
+.s11{transform-box:fill-box;transform-origin:0 0;animation:s11 11.32s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes all{0%,94.70%{opacity:1}100%{opacity:0}}
+.all{animation:all 11.32s ease-in infinite}
+@keyframes caret{0%,12.36%{opacity:1}12.46%,100%{opacity:0}}
+.caret{animation:caret 11.32s steps(1) infinite}
 </style>
-<rect width="1010" height="290" rx="10" fill="#1e1e2e"/>
-<rect width="1010" height="30" rx="10" fill="#181825"/><rect y="20" width="1010" height="10" fill="#181825"/>
-<circle cx="18" cy="15" r="6" fill="#f38ba8"/>
-<circle cx="38" cy="15" r="6" fill="#f9e2af"/>
-<circle cx="58" cy="15" r="6" fill="#a6e3a1"/>
-<text x="505.0" y="20" text-anchor="middle" class="d" style="font-size:12px">occ — building life.c</text>
-<defs><clipPath id="c"><rect class="typing" x="34.8" y="29" height="19" width="0"/></clipPath></defs>
-<text x="18" y="44" style="fill:#a6e3a1" class="b">$</text>
-<text x="34.8" y="44" clip-path="url(#c)">occ -o prod life.c</text>
-<text x="18" y="63" class="l1"><tspan x="18.0" class="b" style="fill:#94e2d5">occ</tspan><tspan x="43.2" class="b"> 1.0.0</tspan><tspan x="93.6"> · x86-64 Linux · C23 · opt=</tspan><tspan x="328.8" class="b" style="fill:#94e2d5">prod</tspan></text>
-<text x="18" y="82" class="l2"><tspan x="18.0">  </tspan><tspan x="34.8" class="b">life.c</tspan></text>
-<text x="18" y="101" class="l3"><tspan x="18.0">    </tspan><tspan x="51.6" class="b" style="fill:#a6e3a1">✓</tspan><tspan x="60.0"> </tspan><tspan x="68.4" style="fill:#d787ff">preprocess</tspan><tspan x="152.4"> </tspan><tspan x="160.8" class="b" style="fill:#a6e3a1">OK  </tspan><tspan x="194.4">   16.28 ms cpu   16.23 ms wall  </tspan><tspan x="471.6" class="d">59 files, 6263 tokens, 1378 macro expansions</tspan></text>
-<text x="18" y="120" class="l4"><tspan x="18.0">    </tspan><tspan x="51.6" class="b" style="fill:#a6e3a1">✓</tspan><tspan x="60.0"> </tspan><tspan x="68.4" style="fill:#5fafff">compile   </tspan><tspan x="152.4"> </tspan><tspan x="160.8" class="b" style="fill:#a6e3a1">OK  </tspan><tspan x="194.4">    2.70 ms cpu    2.63 ms wall  </tspan><tspan x="471.6" class="d">4 functions, 3 globals, 231 instructions</tspan></text>
-<text x="18" y="139" class="l5"><tspan x="18.0">       </tspan><tspan x="76.8" class="d">├ parse+check</tspan><tspan x="186.0">    2.15 ms cpu                  </tspan><tspan x="463.2" class="d">typed AST</tspan></text>
-<text x="18" y="158" class="l6"><tspan x="18.0">       </tspan><tspan x="76.8" class="d">├ optimize   </tspan><tspan x="186.0">    0.07 ms cpu                  </tspan><tspan x="463.2" class="d">14 folded, 26 simplified, 0 dead branches, 4 hoisted from loops</tspan></text>
-<text x="18" y="177" class="l7"><tspan x="18.0">       </tspan><tspan x="76.8" class="d">└ codegen    </tspan><tspan x="186.0">    0.48 ms cpu                  </tspan><tspan x="463.2" class="d">17 vars in registers, 4 peephole removals, 0 jump tables</tspan></text>
-<text x="18" y="196" class="l8"><tspan x="18.0">    </tspan><tspan x="51.6" class="b" style="fill:#a6e3a1">✓</tspan><tspan x="60.0"> </tspan><tspan x="68.4" style="fill:#5fd7d7">assemble  </tspan><tspan x="152.4"> </tspan><tspan x="160.8" class="b" style="fill:#a6e3a1">OK  </tspan><tspan x="194.4">    3.24 ms cpu    3.29 ms wall  </tspan><tspan x="471.6" class="d">life.o (2.5 KiB)</tspan></text>
-<text x="18" y="215" class="l9"><tspan x="18.0">    </tspan><tspan x="51.6" class="b" style="fill:#a6e3a1">✓</tspan><tspan x="60.0"> </tspan><tspan x="68.4" style="fill:#ffaf5f">link      </tspan><tspan x="152.4"> </tspan><tspan x="160.8" class="b" style="fill:#a6e3a1">OK  </tspan><tspan x="194.4">   22.45 ms cpu   27.00 ms wall  </tspan><tspan x="471.6" class="d">life (15.9 KiB, PIE, full RELRO, NX stack)</tspan></text>
-<text x="18" y="234" class="l10"><tspan x="18.0">  </tspan><tspan x="34.8" class="b" style="fill:#a6e3a1">✓</tspan><tspan x="43.2"> </tspan><tspan x="51.6" class="b">built life</tspan><tspan x="135.6"> in 49.14 ms (cpu 44.66 ms) · 0 errors, 0 warnings</tspan></text>
-<text x="18" y="253" class="l11"><tspan x="18.0">    </tspan><tspan x="51.6" style="fill:#d787ff">█████████████</tspan><tspan x="160.8" style="fill:#5fafff">██</tspan><tspan x="177.6" style="fill:#5fd7d7">███</tspan><tspan x="202.8" style="fill:#ffaf5f">██████████████████████</tspan><tspan x="387.6">  </tspan><tspan x="404.4" style="fill:#d787ff">preprocess </tspan><tspan x="496.8" class="d" style="fill:#d787ff">33%</tspan><tspan x="522.0">  </tspan><tspan x="538.8" style="fill:#5fafff">compile </tspan><tspan x="606.0" class="d" style="fill:#5fafff">5%</tspan><tspan x="622.8">  </tspan><tspan x="639.6" style="fill:#5fd7d7">assemble </tspan><tspan x="715.2" class="d" style="fill:#5fd7d7">7%</tspan><tspan x="732.0">  </tspan><tspan x="748.8" style="fill:#ffaf5f">link </tspan><tspan x="790.8" class="d" style="fill:#ffaf5f">55%</tspan></text>
+<rect x="0.5" y="0.5" width="1017" height="317" rx="12" fill="#000000" stroke="#262626"/>
+<path d="M0.5 12.5a12 12 0 0 1 12-12h993a12 12 0 0 1 12 12v22h-1017z" fill="#0d0d0d"/>
+<line x1="0.5" y1="34.5" x2="1017.5" y2="34.5" stroke="#262626"/>
+<circle cx="20" cy="17.5" r="5.5" fill="#3a3a3a"/>
+<circle cx="38" cy="17.5" r="5.5" fill="#3a3a3a"/>
+<circle cx="56" cy="17.5" r="5.5" fill="#3a3a3a"/>
+<text x="509.0" y="22" text-anchor="middle" style="font-size:12px;fill:#8a8a8a">occ — building life.c</text>
+<defs>
+<clipPath id="c0"><rect class="s0" x="20" y="41" width="978" height="20"/></clipPath>
+<clipPath id="c1"><rect class="s1" x="20" y="61" width="978" height="20"/></clipPath>
+<clipPath id="c2"><rect class="s2" x="20" y="81" width="978" height="20"/></clipPath>
+<clipPath id="c3"><rect class="s3" x="20" y="101" width="978" height="20"/></clipPath>
+<clipPath id="c4"><rect class="s4" x="20" y="121" width="978" height="20"/></clipPath>
+<clipPath id="c5"><rect class="s5" x="20" y="141" width="978" height="20"/></clipPath>
+<clipPath id="c6"><rect class="s6" x="20" y="161" width="978" height="20"/></clipPath>
+<clipPath id="c7"><rect class="s7" x="20" y="181" width="978" height="20"/></clipPath>
+<clipPath id="c8"><rect class="s8" x="20" y="201" width="978" height="20"/></clipPath>
+<clipPath id="c9"><rect class="s9" x="20" y="221" width="978" height="20"/></clipPath>
+<clipPath id="c10"><rect class="s10" x="20" y="241" width="978" height="20"/></clipPath>
+<clipPath id="c11"><rect class="s11" x="20" y="261" width="978" height="20"/></clipPath>
+</defs>
+<g class="all">
+<g clip-path="url(#c0)"><text x="22" y="56" class="b" style="fill:#a8c8ff">$</text><text x="38.8" y="56">occ -o prod life.c</text></g>
+<rect class="caret" x="192.0" y="43" width="8" height="16" fill="#a8c8ff" opacity=".8"/>
+<text x="22" y="76" clip-path="url(#c1)"><tspan x="22.0" class="b" style="fill:#a6ecec">occ</tspan><tspan x="47.2" class="b"> 1.0.0</tspan><tspan x="97.6"> · x86-64 Linux · C23 · opt=</tspan><tspan x="332.8" class="b" style="fill:#a6ecec">prod</tspan></text>
+<text x="22" y="96" clip-path="url(#c2)"><tspan x="22.0">  </tspan><tspan x="38.8" class="b">life.c</tspan></text>
+<text x="22" y="116" clip-path="url(#c3)"><tspan x="22.0">    </tspan><tspan x="55.6" class="b" style="fill:#b5f0c8">✓</tspan><tspan x="64.0"> </tspan><tspan x="72.4" style="fill:#d4c1ff">preprocess</tspan><tspan x="156.4"> </tspan><tspan x="164.8" class="b" style="fill:#b5f0c8">OK  </tspan><tspan x="198.4">   16.28 ms cpu   16.23 ms wall  </tspan><tspan x="475.6" class="d">59 files, 6263 tokens, 1378 macro expansions</tspan></text>
+<text x="22" y="136" clip-path="url(#c4)"><tspan x="22.0">    </tspan><tspan x="55.6" class="b" style="fill:#b5f0c8">✓</tspan><tspan x="64.0"> </tspan><tspan x="72.4" style="fill:#a8c8ff">compile   </tspan><tspan x="156.4"> </tspan><tspan x="164.8" class="b" style="fill:#b5f0c8">OK  </tspan><tspan x="198.4">    2.70 ms cpu    2.63 ms wall  </tspan><tspan x="475.6" class="d">4 functions, 3 globals, 231 instructions</tspan></text>
+<text x="22" y="156" clip-path="url(#c5)"><tspan x="22.0">       </tspan><tspan x="80.8" class="d">├ parse+check</tspan><tspan x="190.0">    2.15 ms cpu                  </tspan><tspan x="467.2" class="d">typed AST</tspan></text>
+<text x="22" y="176" clip-path="url(#c6)"><tspan x="22.0">       </tspan><tspan x="80.8" class="d">├ optimize   </tspan><tspan x="190.0">    0.07 ms cpu                  </tspan><tspan x="467.2" class="d">14 folded, 26 simplified, 0 dead branches, 4 hoisted from loops</tspan></text>
+<text x="22" y="196" clip-path="url(#c7)"><tspan x="22.0">       </tspan><tspan x="80.8" class="d">└ codegen    </tspan><tspan x="190.0">    0.48 ms cpu                  </tspan><tspan x="467.2" class="d">17 vars in registers, 4 peephole removals, 0 jump tables</tspan></text>
+<text x="22" y="216" clip-path="url(#c8)"><tspan x="22.0">    </tspan><tspan x="55.6" class="b" style="fill:#b5f0c8">✓</tspan><tspan x="64.0"> </tspan><tspan x="72.4" style="fill:#a6ecec">assemble  </tspan><tspan x="156.4"> </tspan><tspan x="164.8" class="b" style="fill:#b5f0c8">OK  </tspan><tspan x="198.4">    3.24 ms cpu    3.29 ms wall  </tspan><tspan x="475.6" class="d">life.o (2.5 KiB)</tspan></text>
+<text x="22" y="236" clip-path="url(#c9)"><tspan x="22.0">    </tspan><tspan x="55.6" class="b" style="fill:#b5f0c8">✓</tspan><tspan x="64.0"> </tspan><tspan x="72.4" style="fill:#ffd1a8">link      </tspan><tspan x="156.4"> </tspan><tspan x="164.8" class="b" style="fill:#b5f0c8">OK  </tspan><tspan x="198.4">   22.45 ms cpu   27.00 ms wall  </tspan><tspan x="475.6" class="d">life (15.9 KiB, PIE, full RELRO, NX stack)</tspan></text>
+<text x="22" y="256" clip-path="url(#c10)"><tspan x="22.0">  </tspan><tspan x="38.8" class="b" style="fill:#b5f0c8">✓</tspan><tspan x="47.2"> </tspan><tspan x="55.6" class="b">built life</tspan><tspan x="139.6"> in 49.14 ms (cpu 44.66 ms) · 0 errors, 0 warnings</tspan></text>
+<text x="22" y="276" clip-path="url(#c11)"><tspan x="22.0">    </tspan><tspan x="55.6" style="fill:#d4c1ff">█████████████</tspan><tspan x="164.8" style="fill:#a8c8ff">██</tspan><tspan x="181.6" style="fill:#a6ecec">███</tspan><tspan x="206.8" style="fill:#ffd1a8">██████████████████████</tspan><tspan x="391.6">  </tspan><tspan x="408.4" style="fill:#d4c1ff">preprocess </tspan><tspan x="500.8" class="d" style="fill:#d4c1ff">33%</tspan><tspan x="526.0">  </tspan><tspan x="542.8" style="fill:#a8c8ff">compile </tspan><tspan x="610.0" class="d" style="fill:#a8c8ff">5%</tspan><tspan x="626.8">  </tspan><tspan x="643.6" style="fill:#a6ecec">assemble </tspan><tspan x="719.2" class="d" style="fill:#a6ecec">7%</tspan><tspan x="736.0">  </tspan><tspan x="752.8" style="fill:#ffd1a8">link </tspan><tspan x="794.8" class="d" style="fill:#ffd1a8">55%</tspan></text>
+</g>
 </svg>

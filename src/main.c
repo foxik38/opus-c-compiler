@@ -1,4 +1,4 @@
-// main.c - occ, the Opus C Compiler.
+// main.c - occ, the C23 compiler.
 #include "driver/cli.h"
 #include "driver/pipeline.h"
 

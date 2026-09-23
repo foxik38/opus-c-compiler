@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>occ — the C23 compiler for x86-64 Linux</title>
+<meta name="description" content="occ is a self-hosting C23 compiler for x86-64 Linux, written in C23: its own preprocessor, parser, optimizer and code generator, with a build you can watch. It compiles SQLite, Lua and zlib, and itself.">
+<meta property="og:title" content="occ — the C23 compiler for x86-64 Linux">
+<meta property="og:description" content="Self-hosting C23 compiler with a live pipeline display, helpful diagnostics and two optimization levels. Tested on SQLite, Lua, zlib and Csmith.">
+<meta property="og:image" content="https://raw.githubusercontent.com/foxik38/opus-c-compiler/main/docs/assets/social-preview.png">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="assets/logo.svg">
+<style>
+  :root {
+    --bg: #000; --panel: #0a0a0a; --line: #1f1f1f; --text: #f5f5f5; --muted: #8a8a8a;
+    --blue: #a8c8ff; --lav: #d4c1ff; --mint: #b5f0c8; --peach: #ffd1a8; --teal: #a6ecec;
+    --navy: #1e3a8a; --navy-deep: #0b1535;
+    --mono: 'JetBrains Mono', 'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+    --sans: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; }
+  body { margin: 0; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: .92em; background: #111; border: 1px solid var(--line); border-radius: 6px; padding: .08em .4em; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+
+  header { position: sticky; top: 0; z-index: 10; background: rgba(0,0,0,.82); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 58px; }
+  .brand { font-family: var(--mono); font-weight: 800; font-size: 20px; color: var(--text); letter-spacing: .5px; }
+  .brand span { color: var(--blue); }
+  nav a { color: var(--muted); margin-left: 22px; font-size: 14px; }
+  nav a:hover { color: var(--text); text-decoration: none; }
+
+  .hero { padding: 84px 0 40px; text-align: center; background:
+    radial-gradient(900px 380px at 50% -60px, rgba(30,58,138,.55), transparent 70%); }
+  .hero h1 { font-size: clamp(38px, 6vw, 64px); line-height: 1.08; margin: 0 0 18px; letter-spacing: -1.5px; }
+  .hero h1 .grad { background: linear-gradient(90deg, var(--lav), var(--blue) 40%, var(--teal) 70%, var(--peach));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p { color: #b5b5b5; font-size: 19px; max-width: 700px; margin: 0 auto 30px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 11px 22px; border-radius: 10px; font-weight: 600; font-size: 15px; border: 1px solid var(--line); }
+  .btn.primary { background: var(--text); color: #000; border-color: var(--text); }
+  .btn.ghost { background: var(--panel); color: var(--text); }
+  .btn:hover { text-decoration: none; filter: brightness(1.08); }
+  .install { margin: 26px auto 0; max-width: 520px; font-family: var(--mono); font-size: 14px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; text-align: left; color: #d4d4d4; }
+  .install b { color: var(--blue); }
+  .demo { margin: 46px auto 0; max-width: 900px; }
+  .demo img { width: 100%; height: auto; border-radius: 12px; box-shadow: 0 30px 80px rgba(30,58,138,.35); }
+
+  section { padding: 64px 0; border-top: 1px solid #111; }
+  h2 { font-size: 30px; letter-spacing: -.5px; margin: 0 0 8px; }
+  .lead { color: var(--muted); margin: 0 0 32px; max-width: 720px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; position: relative; overflow: hidden; }
+  .card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--accent, var(--blue)); }
+  .card h3 { margin: 4px 0 8px; font-size: 17px; }
+  .card p { margin: 0; color: #a3a3a3; font-size: 14.5px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-top: 26px; }
+  .stat { background: var(--navy-deep); border: 1px solid var(--navy); border-radius: 14px; padding: 18px; text-align: center; }
+  .stat b { display: block; font-size: 28px; font-family: var(--mono); color: var(--text); }
+  .stat span { color: #9fb3e6; font-size: 13.5px; }
+  figure { margin: 0; }
+  figure img { width: 100%; height: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  .ok { color: var(--mint); font-family: var(--mono); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto;
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.55; color: #d4d4d4; margin: 0; }
+  pre .c { color: #6b6b6b; } pre .k { color: var(--blue); }
+  footer { border-top: 1px solid var(--line); padding: 34px 0 50px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  @media (max-width: 760px) { nav a:not(.gh) { display: none; } .two { grid-template-columns: 1fr; } td:first-child { white-space: normal; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="#"><span>›</span> occ</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#diagnostics">Diagnostics</a>
+      <a href="#performance">Performance</a>
+      <a href="#tested">Tested on</a>
+      <a class="gh" href="https://github.com/foxik38/opus-c-compiler">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>A C23 compiler<br><span class="grad">you can watch think.</span></h1>
+    <p>occ is a self-hosting C23 compiler for x86-64 Linux, written in C23 — its own preprocessor, parser,
+      optimizer and code generator, with a live pipeline display and diagnostics that tell you how to fix things.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/foxik38/opus-c-compiler#quick-start">Get started</a>
+      <a class="btn ghost" href="https://github.com/foxik38/opus-c-compiler">View on GitHub</a>
+      <a class="btn ghost" href="https://github.com/foxik38/opus-c-compiler/blob/main/THINKPROC.md">How it was built</a>
+    </div>
+    <div class="install"><b>$</b> git clone https://github.com/foxik38/opus-c-compiler &amp;&amp; cd opus-c-compiler &amp;&amp; make</div>
+    <div class="demo"><img src="assets/demo.svg" alt="occ building a program: every pipeline stage with its status, CPU time and output"></div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything a compiler does — out in the open</h2>
+    <p class="lead">No black box: every stage reports what it did and how long it took, and the source is small enough to read.</p>
+    <div class="grid">
+      <div class="card" style="--accent: var(--lav)"><h3>The whole pipeline</h3><p>Preprocessor, typed-AST parser, optimizer and x86-64 code generator are occ's own. GNU <code>as</code> and <code>ld</code> finish the job — PIE, full RELRO, NX stack.</p></div>
+      <div class="card" style="--accent: var(--blue)"><h3>A build you can watch</h3><p>Stages animate while they run, show CPU and wall time, and the summary charts where the time went. Pipes get plain, GCC-compatible text.</p></div>
+      <div class="card" style="--accent: var(--mint)"><h3>Diagnostics that help</h3><p>Source excerpts, <code>help:</code> hints and 27 named warnings aimed at undefined behavior and deprecated features.</p></div>
+      <div class="card" style="--accent: var(--peach)"><h3>Two optimization levels</h3><p><code>-o none</code> is obviously correct; <code>-o prod</code> adds register allocation, addressing modes, LICM, jump tables and a peephole pass.</p></div>
+      <div class="card" style="--accent: var(--teal)"><h3>Modern C</h3><p><code>constexpr</code>, <code>auto</code>, <code>typeof</code>, <code>nullptr</code>, <code>#embed</code>, attributes, <code>&lt;stdckdint.h&gt;</code>, typed enums, <code>#pragma pack</code>.</p></div>
+      <div class="card" style="--accent: var(--lav)"><h3>Compiles itself</h3><p>occ builds occ, and that compiler builds occ again: both emit byte-identical assembly — a bootstrap fixpoint, checked in CI.</p></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>307k</b><span>lines of SQLite built and verified</span></div>
+      <div class="stat"><b>9</b><span>real-world projects pass their tests</span></div>
+      <div class="stat"><b>500+</b><span>Csmith programs match GCC</span></div>
+      <div class="stat"><b>up to 4×</b><span>faster with <code>-o prod</code> than <code>-o none</code></span></div>
+    </div>
+  </div>
+</section>
+
+<section id="diagnostics">
+  <div class="wrap">
+    <h2>Diagnostics that point at the fix</h2>
+    <p class="lead">The first line keeps GCC's <code>file:line:col</code> format so editors understand it; below it, the source line, the warning's name and a hint.</p>
+    <figure><img src="assets/diagnostics.svg" alt="occ diagnostics for a file with five mistakes"></figure>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lead">A fully typed AST — every implicit conversion made explicit — feeds a code generator that starts as an obviously correct stack machine and, at <code>-o prod</code>, removes its costs.</p>
+    <figure><img src="assets/pipeline.svg" alt="The occ pipeline: preprocess, compile (parse, optimize, codegen), assemble, link"></figure>
+  </div>
+</section>
+
+<section id="performance">
+  <div class="wrap two">
+    <div>
+      <h2>Performance</h2>
+      <p class="lead">Best of three runs; every build prints the same checksum. <code>-o prod</code> beats <code>gcc -O0</code> everywhere and stays within 20% of <code>gcc -O2</code> on four of six benchmarks.</p>
+      <pre><span class="c"># build with optimizations and run</span>
+<span class="k">occ</span> -o prod examples/life.c --run -- 30
+
+<span class="c"># compare against GCC yourself</span>
+<span class="k">make</span> bench</pre>
+    </div>
+    <figure><img src="assets/benchmarks.svg" alt="Benchmark times of occ -o none, occ -o prod, gcc -O0 and gcc -O2"></figure>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="wrap">
+    <h2>Tested on real code</h2>
+    <p class="lead">Built with occ at both optimization levels and checked with their own test suites, or byte for byte against GCC builds.</p>
+    <table>
+      <tr><th>Project</th><th>Size</th><th>Result</th></tr>
+      <tr><td>SQLite 3.53</td><td>307k lines</td><td><span class="ok">✓</span> speedtest1 verification hash identical to GCC's</td></tr>
+      <tr><td>Duktape 2.7</td><td>108k lines</td><td><span class="ok">✓</span> JavaScript test script: identical output</td></tr>
+      <tr><td>Jim Tcl 0.83</td><td>43k lines</td><td><span class="ok">✓</span> 5551 of 5729 tests pass — the same as with GCC</td></tr>
+      <tr><td>Lua 5.4.9</td><td>30k lines</td><td><span class="ok">✓</span> test script: identical output</td></tr>
+      <tr><td>zlib, bzip2, LZ4</td><td>51k lines</td><td><span class="ok">✓</span> compressed output byte-identical to GCC builds</td></tr>
+      <tr><td>xxHash 0.8.3</td><td>12k lines</td><td><span class="ok">✓</span> 49948 sanity-test vectors pass</td></tr>
+      <tr><td>Csmith</td><td>random</td><td><span class="ok">✓</span> 500+ generated programs match GCC</td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="wrap two">
+    <div>
+      <h2>Try it</h2>
+      <p class="lead">You need a C23 compiler to bootstrap (tested with GCC 13 and Clang 18), GNU binutils and the glibc headers — <code>build-essential</code> on Debian/Ubuntu, <code>base-devel</code> on Arch.</p>
+      <p class="lead">Read in <a href="https://github.com/foxik38/opus-c-compiler/blob/main/README.md">English</a> ·
+        <a href="https://github.com/foxik38/opus-c-compiler/blob/main/README.cs.md">Čeština</a> ·
+        <a href="https://github.com/foxik38/opus-c-compiler/blob/main/README.hu.md">Magyar</a> ·
+        <a href="https://github.com/foxik38/opus-c-compiler/blob/main/README.he.md">עברית</a></p>
+    </div>
+    <pre><span class="k">make</span>                  <span class="c"># builds ./occ</span>
+<span class="k">make</span> test             <span class="c"># every test, both levels</span>
+<span class="k">sudo make</span> install     <span class="c"># /usr/local/bin/occ</span>
+
+<span class="k">occ</span> examples/hello.c --run
+<span class="k">occ</span> --warnings        <span class="c"># all 27 warnings</span></pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>occ · MIT licensed · designed, written and tested by Claude</span>
+    <span><a href="https://github.com/foxik38/opus-c-compiler">GitHub</a> · <a href="https://github.com/foxik38/opus-c-compiler/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/foxik38/opus-c-compiler/blob/main/THINKPROC.md">Design notes</a></span>
+  </div>
+</footer>
+</body>
+</html>

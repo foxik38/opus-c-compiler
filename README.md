@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="occ — the Opus C Compiler" width="520">
+<img src="docs/assets/logo.svg" alt="occ — the C23 compiler for x86-64 Linux" width="640">
 
 **A self-hosting C23 compiler for x86-64 Linux, written in C23.**<br>
 Its own preprocessor, parser, optimizer and code generator — with a build you can watch.
@@ -270,6 +270,12 @@ this repository: every commit, test and page of documentation. The reasoning beh
 the bugs found along the way and how they were caught are in [THINKPROC.md](THINKPROC.md).
 
 <br clear="left">
+
+## Contributing
+
+Bug reports are the most valuable contribution — especially a C program that occ compiles
+differently from GCC. See [CONTRIBUTING.md](CONTRIBUTING.md), the [changelog](CHANGELOG.md) and the
+[security policy](SECURITY.md).
 
 ## License
 

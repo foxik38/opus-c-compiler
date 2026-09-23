@@ -1,4 +1,4 @@
-# occ - the Opus C Compiler
+# occ - a C23 compiler for x86-64 Linux
 #
 #   make            build ./occ
 #   make test       run the test suite (every test at -o none and -o prod)

@@ -1,0 +1,35 @@
+name: Bug report
+description: occ rejects valid code, miscompiles it, or reports something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks! A small C program that behaves differently with occ than with GCC or Clang is the most useful thing you can send.
+  - type: textarea
+    id: program
+    attributes:
+      label: Program
+      description: The smallest C program that shows the problem.
+      render: c
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command line
+      placeholder: occ -o prod bug.c --run
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happens, and what you expected
+      description: occ's output (or the program's), and what GCC or Clang produce instead.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Distribution, `occ --version`, and the compiler that built occ.
+      placeholder: Arch Linux, occ 1.0.0, built with GCC 15

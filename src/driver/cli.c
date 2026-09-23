@@ -97,7 +97,7 @@ Options parse_args(int argc, char **argv) {
       exit(0);
     }
     if (strcmp(a, "--version") == 0) {
-      printf("occ (Opus C Compiler) " OCC_VERSION "\n"
+      printf("occ " OCC_VERSION "\n"
              "Target: x86_64-linux-gnu, language: C23\n");
       exit(0);
     }
